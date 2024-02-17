@@ -4,7 +4,7 @@ import argparse
 import logging
 import tkinter as tk
 from tkinter import ttk
-from board_ui_lib import \
+from dashboard_ui import \
     CustomRedis, Tag, TagsBase, Tab, PdfTab, Geometry, wait_uptime, \
     AirQualityTile, ClockTile, DaysAccTileLoos, EmptyTile, GaugeTile, NewsBannerTile, \
     FlysprayTile, ImageRawTile, ImageRawCarouselTile, VigilanceTile, WattsTile, WeatherTile
@@ -28,7 +28,6 @@ class Tags(TagsBase):
     D_W_FORECAST_LOOS = Tag(read=lambda: DB.main.get_js('json:weather:forecast:loos'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
     D_NEWS_LOCAL = Tag(read=lambda: DB.main.get_js('json:news'), io_every=2.0)
-    D_TWEETS_GRT = Tag(read=lambda: DB.main.get_js('json:tweets:@grtgaz'), io_every=2.0)
     MET_PWR_ACT = Tag(read=lambda: DB.main.get_js('int:loos_elec:pwr_act'), io_every=1.0)
     MET_TODAY_WH = Tag(read=lambda: DB.main.get_js('float:loos_elec:today_wh'), io_every=2.0)
     MET_YESTERDAY_WH = Tag(read=lambda: DB.main.get_js('float:loos_elec:yesterday_wh'), io_every=2.0)

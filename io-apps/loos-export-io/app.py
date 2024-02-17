@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-from board_lib import CustomRedis, catch_log_except
 import logging
-import time
 import schedule
+import time
 from private_data import REDIS_USER, REDIS_PASS
+from dashboard_io import CustomRedis, catch_log_except
 
 
 # some class

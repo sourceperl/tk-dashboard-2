@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-from board_lib import catch_log_except
 import logging
 import time
 import schedule
 from pyHMI.DS_ModbusTCP import ModbusTCPDevice
 from pyHMI.DS_Redis import RedisDevice
 from pyHMI.Tag import Tag
+from dashboard_io import catch_log_except
 from private_data import REDIS_USER, REDIS_PASS
 
 

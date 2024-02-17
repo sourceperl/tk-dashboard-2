@@ -4,7 +4,7 @@ import argparse
 import logging
 import tkinter as tk
 from tkinter import ttk
-from board_ui_lib import \
+from dashboard_ui import \
     CustomRedis, Tag, TagsBase, Tab, PdfTab, Geometry, wait_uptime, \
     AirQualityTile, ClockTile, DaysAccTileMessein, FlysprayTile, GaugeTile, \
     ImageRawTile, ImageRawCarouselTile, NewsBannerTile, TwitterTile, VigilanceTile

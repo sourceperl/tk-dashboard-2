@@ -19,7 +19,7 @@ import pytz
 import pdf2image
 import PIL.Image
 import PIL.ImageDraw
-from board_lib import CustomRedis, catch_log_except, dt_utc_to_local
+from dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local
 from webdav import WebDAV
 from private_data import REDIS_USER, REDIS_PASS, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
     WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
