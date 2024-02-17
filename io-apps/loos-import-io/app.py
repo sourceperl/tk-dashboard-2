@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from collections import Counter
-from configparser import ConfigParser
 from datetime import datetime, timedelta
 import urllib.parse
 import hashlib
