@@ -608,6 +608,11 @@ class DaysAccTileMessein(Tile):
             return 'n/a'
 
 
+class EmptyTile(Tile):
+    def __init__(self, *args, title='', **kwargs):
+        Tile.__init__(self, *args, **kwargs)
+
+
 class FlysprayTile(Tile):
     def __init__(self, *args, title='', **kwargs):
         Tile.__init__(self, *args, **kwargs)

@@ -257,7 +257,7 @@ def owc_sync_carousel_job():
         DB.main.hdel(DIR_CAR_RAW, f)
     # list owncloud files (disallow directory)
     own_files_d = {}
-    for f_d in wdv.ls(webdav_carousel_img_dir):
+    for f_d in wdv.ls(WEBDAV_CAROUSEL_IMG_DIR):
         file_path = f_d['file_path']
         size = f_d['content_length']
         if file_path and not file_path.endswith('/'):
@@ -284,7 +284,7 @@ def owc_sync_carousel_job():
     # exist only on remote owncloud
     for f in list(set(own_files_d) - set(local_files_d)):
         logging.info('"%s" exist only on remote -> download it' % f)
-        data = wdv.download(os.path.join(webdav_carousel_img_dir, f))
+        data = wdv.download(os.path.join(WEBDAV_CAROUSEL_IMG_DIR, f))
         if data:
             update_carousel_raw_data(f, data)
     # exist at both side (update only if file size change)
@@ -294,7 +294,7 @@ def owc_sync_carousel_job():
         logging.debug(f'check "{f}" remote size [{remote_size}]/local size [{local_size}]')
         if local_size != remote_size:
             logging.info(f'"{f}" size mismatch -> download it')
-            data = wdv.download(os.path.join(webdav_carousel_img_dir, f))
+            data = wdv.download(os.path.join(WEBDAV_CAROUSEL_IMG_DIR, f))
             if data:
                 update_carousel_raw_data(f, data)
     # log sync end
@@ -343,7 +343,7 @@ def owc_sync_doc_job():
         DB.main.hdel(DIR_DOC_RAW, f)
     # list owncloud files (disallow directory)
     own_files_d = {}
-    for f_d in wdv.ls(webdav_reglement_doc_dir):
+    for f_d in wdv.ls(WEBDAV_REGLEMENT_DOC_DIR):
         file_path = f_d['file_path']
         size = f_d['content_length']
         if file_path and not file_path.endswith('/'):
@@ -363,7 +363,7 @@ def owc_sync_doc_job():
     # exist only on remote owncloud
     for f in list(set(own_files_d) - set(local_files_d)):
         logging.info(f'"{f}" exist only on remote -> download it')
-        data = wdv.download(os.path.join(webdav_reglement_doc_dir, f))
+        data = wdv.download(os.path.join(WEBDAV_REGLEMENT_DOC_DIR, f))
         if data:
             update_doc_raw_data(f, data)
     # exist at both side (update only if file size change)
@@ -373,7 +373,7 @@ def owc_sync_doc_job():
         logging.debug(f'check "{f}" remote size [{remote_size}]/local size [{local_size}]')
         if local_size != remote_size:
             logging.info(f'"{f}" size mismatch -> download it')
-            data = wdv.download(os.path.join(webdav_reglement_doc_dir, f))
+            data = wdv.download(os.path.join(WEBDAV_REGLEMENT_DOC_DIR, f))
             if data:
                 update_doc_raw_data(f, data)
     # log sync end

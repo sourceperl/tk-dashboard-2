@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import ttk
 from board_ui_lib import \
     CustomRedis, Tag, TagsBase, Tab, PdfTab, Geometry, wait_uptime, \
-    AirQualityTile, ClockTile, DaysAccTileLoos, GaugeTile, NewsBannerTile, TwitterTile, \
+    AirQualityTile, ClockTile, DaysAccTileLoos, EmptyTile, GaugeTile, NewsBannerTile, \
     FlysprayTile, ImageRawTile, ImageRawCarouselTile, VigilanceTile, WattsTile, WeatherTile
 from private_data import REDIS_USER, REDIS_PASS
 
@@ -35,7 +35,6 @@ class Tags(TagsBase):
     L_FLYSPRAY_RSS = Tag(read=lambda: DB.main.get_js('json:flyspray-nord'), io_every=2.0)
     IMG_ATMO_HDF = Tag(read=lambda: DB.main.get('img:static:logo-atmo-hdf:png'), io_every=10.0)
     IMG_LOGO_GRT = Tag(read=lambda: DB.main.get('img:static:logo-grt:png'), io_every=10.0)
-    IMG_GRT_CLOUD = Tag(read=lambda: DB.main.get('img:grt-twitter-cloud:png'), io_every=10.0)
     IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
     DIR_CAROUSEL_RAW = Tag(read=lambda: DB.main.hgetall('dir:carousel:raw:min-png'), io_every=10.0)
     DIR_PDF_DOC_LIST = Tag(read=lambda: map(bytes.decode, DB.main.hkeys('dir:doc:raw')))
@@ -119,9 +118,9 @@ class LiveTab(Tab):
         # clock
         self.tl_clock = ClockTile(self)
         self.tl_clock.set_tile(row=0, column=5, rowspan=2, columnspan=3)
-        # twitter cloud img
-        self.tl_img_cloud = ImageRawTile(self, bg='black')
-        self.tl_img_cloud.set_tile(row=2, column=5, rowspan=2, columnspan=3)
+        # empty
+        self.tl_empty = EmptyTile(self)
+        self.tl_empty.set_tile(row=2, column=5, rowspan=2, columnspan=8)
         # news banner
         self.tl_news = NewsBannerTile(self)
         self.tl_news.set_tile(row=8, column=0, columnspan=17)
@@ -158,9 +157,6 @@ class LiveTab(Tab):
         # acc days stat
         self.tl_acc = DaysAccTileLoos(self)
         self.tl_acc.set_tile(row=0, column=8, columnspan=5, rowspan=2)
-        # twitter
-        self.tl_tw_live = TwitterTile(self)
-        self.tl_tw_live.set_tile(row=2, column=8, columnspan=5, rowspan=2)
         # grt img
         self.tl_img_grt = ImageRawTile(self, bg='white')
         self.tl_img_grt.set_tile(row=6, column=13, rowspan=2, columnspan=4)
@@ -175,7 +171,7 @@ class LiveTab(Tab):
 
     def update(self):
         # GRT wordcloud
-        self.tl_img_cloud.raw_display = Tags.IMG_GRT_CLOUD.get()
+        #self.tl_img_cloud.raw_display = Tags.IMG_GRT_CLOUD.get()
         # traffic map
         self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
         # atmo
@@ -185,8 +181,6 @@ class LiveTab(Tab):
         # acc days stat
         self.tl_acc.acc_date_dts = Tags.D_GSHEET_GRT.get(('tags', 'DATE_ACC_DTS'))
         self.tl_acc.acc_date_digne = Tags.D_GSHEET_GRT.get(('tags', 'DATE_ACC_DIGNE'))
-        # twitter
-        self.tl_tw_live.l_tweet = Tags.D_TWEETS_GRT.get('tweets')
         # weather
         self.tl_weath.w_today_dict = Tags.D_W_TODAY_LOOS.get()
         self.tl_weath.w_forecast_dict = Tags.D_W_FORECAST_LOOS.get()
