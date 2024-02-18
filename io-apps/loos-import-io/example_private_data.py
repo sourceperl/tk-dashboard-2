@@ -1,6 +1,9 @@
 # redis
 REDIS_USER = None
 REDIS_PASS = None
+# dweet
+DWEET_URL = ''
+DWEET_KEY = ''
 # gmap
 GMAP_IMG_URL = ''
 # gsheet

@@ -650,9 +650,8 @@ class FlysprayTile(Tile):
         try:
             msg = ''
             # limit titles number
-            for item in self._l_items[:TTE_MAX_NB]:
+            for title in self._l_items[:TTE_MAX_NB]:
                 # limit title length
-                title = item['title']
                 title = (title[:TTE_MAX_LEN - 2] + '..') if len(title) > TTE_MAX_LEN else title
                 msg += '%s\n' % title
             self._msg_text.set(msg)

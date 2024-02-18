@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from datetime import datetime, timedelta
-import urllib.parse
 import hashlib
 import io
 import json
@@ -9,9 +8,10 @@ import logging
 import os
 import re
 import time
+from urllib.request import Request, urlopen
 from xml.dom import minidom
+from cryptography.fernet import Fernet, InvalidToken
 import feedparser
-import requests
 import schedule
 import PIL.Image
 from metar.Metar import Metar
@@ -21,7 +21,7 @@ import PIL.Image
 import PIL.ImageDraw
 from dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local
 from webdav import WebDAV
-from private_data import REDIS_USER, REDIS_PASS, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
+from private_data import REDIS_USER, REDIS_PASS, DWEET_URL, DWEET_KEY, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
     WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
 
 
@@ -38,7 +38,6 @@ class DB:
     # create connector
     main = CustomRedis(host='localhost', username=REDIS_USER, password=REDIS_PASS,
                        socket_timeout=4, socket_keepalive=True)
-    bridge = CustomRedis(host='board-redis-cli-bridge-int', socket_timeout=4, socket_keepalive=True)
 
 
 # some function
@@ -46,82 +45,101 @@ class DB:
 def air_quality_atmo_hdf_job():
     url = 'https://services8.arcgis.com/' + \
           'rxZzohbySMKHTNcy/arcgis/rest/services/ind_hdf_3j/FeatureServer/0/query' + \
-          '?where=%s' % urllib.parse.quote('code_zone IN (02691, 59183, 59350, 59392, 59606, 80021)') + \
+          '?where=code_zone IN (02691, 59183, 59350, 59392, 59606, 80021)' + \
           '&outFields=date_ech, code_qual, lib_qual, lib_zone, code_zone' + \
           '&returnGeometry=false&resultRecordCount=48' + \
-          '&orderByFields=%s&f=json' % urllib.parse.quote('date_ech DESC')
-    today_dt_date = datetime.today().date()
+          '&orderByFields=date_ech DESC&f=json'
+    url = url.replace(' ', '%20')
     # https request
-    r = requests.get(url, timeout=5.0)
-    # check error
-    if r.status_code == 200:
-        # decode json message
-        atmo_raw_d = r.json()
-        # populate zones dict with receive values
-        zones_d = {}
-        for record in atmo_raw_d['features']:
-            # load record data
-            r_code_zone = record['attributes']['code_zone']
-            r_ts = int(record['attributes']['date_ech'])
-            r_dt = datetime.utcfromtimestamp(r_ts / 1000)
-            r_value = record['attributes']['code_qual']
-            # retain today value
-            if r_dt.date() == today_dt_date:
-                zones_d[r_code_zone] = r_value
-        # skip key publish if zones_d is empty
-        if not zones_d:
-            raise ValueError('dataset is empty')
-        # create and populate result dict
-        d_air_quality = {'amiens': zones_d.get('80021', 0),
-                         'dunkerque': zones_d.get('59183', 0),
-                         'lille': zones_d.get('59350', 0),
-                         'maubeuge': zones_d.get('59392', 0),
-                         'saint-quentin': zones_d.get('02691', 0),
-                         'valenciennes': zones_d.get('59606', 0)}
-        # update redis
-        DB.main.set_as_json('json:atmo', d_air_quality, ex=6 * 3600)
+    uo_ret = urlopen(url, timeout=5.0)
+    # decode json message
+    atmo_raw_d = json.load(uo_ret)
+    # populate zones dict with receive values
+    today_dt_date = datetime.today().date()
+    zones_d = {}
+    for record in atmo_raw_d['features']:
+        # load record data
+        r_code_zone = record['attributes']['code_zone']
+        r_ts = int(record['attributes']['date_ech'])
+        r_dt = datetime.utcfromtimestamp(r_ts / 1000)
+        r_value = record['attributes']['code_qual']
+        # retain today value
+        if r_dt.date() == today_dt_date:
+            zones_d[r_code_zone] = r_value
+    # skip key publish if zones_d is empty
+    if not zones_d:
+        raise ValueError('dataset is empty')
+    # create and populate result dict
+    d_air_quality = {'amiens': zones_d.get('80021', 0),
+                     'dunkerque': zones_d.get('59183', 0),
+                     'lille': zones_d.get('59350', 0),
+                     'maubeuge': zones_d.get('59392', 0),
+                     'saint-quentin': zones_d.get('02691', 0),
+                     'valenciennes': zones_d.get('59606', 0)}
+    # update redis
+    DB.main.set_as_json('json:atmo', d_air_quality, ex=6*3600)
 
 
 @catch_log_except()
-def bridge_job():
-    # TODO fix this
-    raise NotImplementedError()
-    # relay flyspray data from bridge to main DB
-    fly_data_nord = DB.bridge.get_from_json('rx:bur:flyspray_rss_nord')
-    fly_data_est = DB.bridge.get_from_json('rx:bur:flyspray_rss_est')
-    if fly_data_nord:
-        DB.main.set_as_json('json:flyspray-nord', fly_data_nord, ex=1 * 3600)
-    if fly_data_est:
-        DB.main.set_as_json('json:flyspray-est', fly_data_est, ex=1 * 3600)
+def dweet_job():
+    # request
+    uo_ret = urlopen(DWEET_URL, timeout=10.0)
+    dweet_msg = uo_ret.read()
+    data_d = json.loads(dweet_msg)
+    # check dweet success
+    if data_d['this'] != 'succeeded':
+        raise RuntimeError(f'dweet request failed with json: {data_d}')
+    # search your raw message
+    try:
+        raw_msg = data_d['with'][0]['content']['raw_flyspray_nord']
+    except (IndexError, KeyError):
+        raise RuntimeError('key missing in dweet message')
+    # check length or raw message
+    if not 20 < len(raw_msg) <= 2000:
+        raise RuntimeError('raw message have a wrong size')
+    # decrypt raw message (loses it's validity 20 mn after being encrypted)
+    try:
+        fernet = Fernet(key=DWEET_KEY)
+        plain_msg = fernet.decrypt(raw_msg, ttl=20*60)
+    except InvalidToken:
+        raise RuntimeError('unable to decrypt message')
+    # check format
+    try:
+        js_obj = json.loads(plain_msg)
+    except json.JSONDecodeError:
+        raise RuntimeError('decrypt message is not a valid json')
+    if type(js_obj) is not list:
+        raise RuntimeError('json message is not a list')
+    # if all is ok: publish json to redis
+    DB.main.set_as_json('json:flyspray-nord', js_obj, ex=3600)
 
 
 @catch_log_except()
 def gsheet_job():
     # https request
-    response = requests.get(GSHEET_URL, timeout=5.0)
+    uo_ret = urlopen(GSHEET_URL, timeout=5.0)
     # process response
     d = dict()
-    for line in response.iter_lines(decode_unicode=True):
+    for line in uo_ret.read().decode().splitlines():
         tag, value = line.split(',')
         d[tag] = value
     redis_d = dict(update=datetime.now().isoformat('T'), tags=d)
-    DB.main.set_as_json('json:gsheet', redis_d, ex=2 * 3600)
+    DB.main.set_as_json('json:gsheet', redis_d, ex=2*3600)
 
 
 @catch_log_except()
 def img_gmap_traffic_job():
     # http request
-    r = requests.get(GMAP_IMG_URL, stream=True, timeout=5.0)
-    if r.status_code == 200:
-        # convert RAW img format (bytes) to Pillow image
-        pil_img = PIL.Image.open(io.BytesIO(r.raw.read()))
-        # crop image
-        pil_img = pil_img.crop((0, 0, 560, 328))
-        # pil_img.thumbnail([632, 328])
-        img_io = io.BytesIO()
-        pil_img.save(img_io, format='PNG')
-        # store RAW PNG to redis key
-        DB.main.set('img:traffic-map:png', img_io.getvalue(), ex=2 * 3600)
+    uo_ret = urlopen(GMAP_IMG_URL, timeout=5.0)
+    # convert RAW img format (bytes) to Pillow image
+    pil_img = PIL.Image.open(io.BytesIO(uo_ret.read()))
+    # crop image
+    pil_img = pil_img.crop((0, 0, 560, 328))
+    # pil_img.thumbnail([632, 328])
+    img_io = io.BytesIO()
+    pil_img.save(img_io, format='PNG')
+    # store RAW PNG to redis key
+    DB.main.set('img:traffic-map:png', img_io.getvalue(), ex=2*3600)
 
 
 @catch_log_except()
@@ -133,7 +151,7 @@ def local_info_job():
         title = title.strip()
         title = title.replace('\n', ' ')
         l_titles.append(title)
-    DB.main.set_as_json('json:news', l_titles, ex=2 * 3600)
+    DB.main.set_as_json('json:news', l_titles, ex=2*3600)
 
 
 @catch_log_except()
@@ -142,7 +160,8 @@ def openweathermap_forecast_job():
     ow_url = 'http://api.openweathermap.org/data/2.5/forecast?'
     ow_url += 'q=Loos,fr&appid=%s&units=metric&lang=fr' % OW_APP_ID
     # do request
-    ow_d = requests.get(ow_url, timeout=5.0).json()
+    uo_ret = urlopen(ow_url, timeout=5.0)
+    ow_d = json.load(uo_ret)
     # decode json
     t_today = None
     d_days = {}
@@ -383,81 +402,78 @@ def owc_sync_doc_job():
 @catch_log_except()
 def vigilance_job():
     # request XML data from server
-    r = requests.get('http://vigilance.meteofrance.com/data/NXFR34_LFPW_.xml', timeout=10.0)
-    # check error
-    if r.status_code == 200:
-        # dom parsing (convert UTF-8 r.text to XML char)
-        dom = minidom.parseString(r.text.encode('ascii', 'xmlcharrefreplace'))
-        # set dict for dep data
-        vig_data = {'update': '', 'department': {}}
-        # map build date
-        tz = pytz.timezone('Europe/Paris')
-        map_date = str(dom.getElementsByTagName('entetevigilance')[0].getAttribute('dateinsert'))
-        map_dt = tz.localize(datetime(int(map_date[0:4]), int(map_date[4:6]),
-                                      int(map_date[6:8]), int(map_date[8:10]),
-                                      int(map_date[10:12])))
-        vig_data['update'] = map_dt.isoformat()
-        # parse every departments
-        for items in dom.getElementsByTagName('datavigilance'):
-            # current department
-            dep_code = str(items.attributes['dep'].value)
-            # get risk ID  if exist
-            risk_id = []
-            for risk in items.getElementsByTagName('risque'):
-                risk_id.append(int(risk.attributes['valeur'].value))
-            # get flood ID if exist
-            flood_id = None
-            for flood in items.getElementsByTagName('crue'):
-                flood_id = int(flood.attributes['valeur'].value)
-            # get color ID
-            color_id = int(items.attributes['couleur'].value)
-            # build vig_data
-            vig_data['department'][dep_code] = {'vig_level': color_id,
-                                                'flood_level': flood_id,
-                                                'risk_id': risk_id}
-        DB.main.set_as_json('json:vigilance', vig_data, ex=2 * 3600)
+    uo_ret = urlopen('http://vigilance.meteofrance.com/data/NXFR34_LFPW_.xml', timeout=10.0)
+    # dom parsing (convert UTF-8 r.text to XML char)
+    dom = minidom.parseString(uo_ret.read().decode().encode('ascii', 'xmlcharrefreplace'))
+    # set dict for dep data
+    vig_data = {'update': '', 'department': {}}
+    # map build date
+    tz = pytz.timezone('Europe/Paris')
+    map_date = str(dom.getElementsByTagName('entetevigilance')[0].getAttribute('dateinsert'))
+    map_dt = tz.localize(datetime(int(map_date[0:4]), int(map_date[4:6]),
+                                  int(map_date[6:8]), int(map_date[8:10]),
+                                  int(map_date[10:12])))
+    vig_data['update'] = map_dt.isoformat()
+    # parse every departments
+    for items in dom.getElementsByTagName('datavigilance'):
+        # current department
+        dep_code = str(items.attributes['dep'].value)
+        # get risk ID  if exist
+        risk_id = []
+        for risk in items.getElementsByTagName('risque'):
+            risk_id.append(int(risk.attributes['valeur'].value))
+        # get flood ID if exist
+        flood_id = None
+        for flood in items.getElementsByTagName('crue'):
+            flood_id = int(flood.attributes['valeur'].value)
+        # get color ID
+        color_id = int(items.attributes['couleur'].value)
+        # build vig_data
+        vig_data['department'][dep_code] = {'vig_level': color_id,
+                                            'flood_level': flood_id,
+                                            'risk_id': risk_id}
+    DB.main.set_as_json('json:vigilance', vig_data, ex=2*3600)
 
 
 @catch_log_except()
 def weather_today_job():
     # request data from NOAA server (METAR of Lille-Lesquin Airport)
-    r = requests.get('http://tgftp.nws.noaa.gov/data/observations/metar/stations/LFQQ.TXT',
-                     timeout=10.0, headers={'User-Agent': USER_AGENT})
-    # check error
-    if r.status_code == 200:
-        # extract METAR message
-        metar_msg = r.content.decode().split('\n')[1]
-        # METAR parse
-        obs = Metar(metar_msg)
-        # init and populate d_today dict
-        d_today = {}
-        # message date and time
-        if obs.time:
-            d_today['update_iso'] = obs.time.strftime('%Y-%m-%dT%H:%M:%SZ')
-            d_today['update_fr'] = dt_utc_to_local(obs.time).strftime('%H:%M %d/%m')
-        # current temperature
-        if obs.temp:
-            d_today['temp'] = round(obs.temp.value('C'))
-        # current dew point
-        if obs.dewpt:
-            d_today['dewpt'] = round(obs.dewpt.value('C'))
-        # current pressure
-        if obs.press:
-            d_today['press'] = round(obs.press.value('hpa'))
-        # current wind speed
-        if obs.wind_speed:
-            d_today['w_speed'] = round(obs.wind_speed.value('KMH'))
-        # current wind gust
-        if obs.wind_gust:
-            d_today['w_gust'] = round(obs.wind_gust.value('KMH'))
-        # current wind direction
-        if obs.wind_dir:
-            # replace 'W'est by 'O'uest
-            d_today['w_dir'] = obs.wind_dir.compass().replace('W', 'O')
-        # weather status str
-        d_today['descr'] = 'n/a'
-        # store to redis
-        DB.main.set_as_json('json:weather:today:loos', d_today, ex=2 * 3600)
+    request = Request(url='http://tgftp.nws.noaa.gov/data/observations/metar/stations/LFQQ.TXT',
+                      headers={'User-Agent': USER_AGENT})
+    uo_ret = urlopen(request, timeout=10.0)
+    # extract METAR message
+    metar_msg = uo_ret.read().decode().split('\n')[1]
+    # METAR parse
+    obs = Metar(metar_msg)
+    # init and populate d_today dict
+    d_today = {}
+    # message date and time
+    if obs.time:
+        d_today['update_iso'] = obs.time.strftime('%Y-%m-%dT%H:%M:%SZ')
+        d_today['update_fr'] = dt_utc_to_local(obs.time).strftime('%H:%M %d/%m')
+    # current temperature
+    if obs.temp:
+        d_today['temp'] = round(obs.temp.value('C'))
+    # current dew point
+    if obs.dewpt:
+        d_today['dewpt'] = round(obs.dewpt.value('C'))
+    # current pressure
+    if obs.press:
+        d_today['press'] = round(obs.press.value('hpa'))
+    # current wind speed
+    if obs.wind_speed:
+        d_today['w_speed'] = round(obs.wind_speed.value('KMH'))
+    # current wind gust
+    if obs.wind_gust:
+        d_today['w_gust'] = round(obs.wind_gust.value('KMH'))
+    # current wind direction
+    if obs.wind_dir:
+        # replace 'W'est by 'O'uest
+        d_today['w_dir'] = obs.wind_dir.compass().replace('W', 'O')
+    # weather status str
+    d_today['descr'] = 'n/a'
+    # store to redis
+    DB.main.set_as_json('json:weather:today:loos', d_today, ex=2*3600)
 
 
 # main
@@ -475,7 +491,7 @@ if __name__ == '__main__':
     schedule.every(1).hours.do(owc_sync_carousel_job)
     schedule.every(1).hours.do(owc_sync_doc_job)
     schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
-    schedule.every(2).minutes.do(bridge_job)
+    schedule.every(5).minutes.do(dweet_job)
     schedule.every(5).minutes.do(gsheet_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
     schedule.every(5).minutes.do(local_info_job)
@@ -484,7 +500,7 @@ if __name__ == '__main__':
     schedule.every(5).minutes.do(weather_today_job)
     # first call
     air_quality_atmo_hdf_job()
-    bridge_job()
+    dweet_job()
     gsheet_job()
     img_gmap_traffic_job()
     local_info_job()
