@@ -11,12 +11,6 @@ sudo apt upgrade -y
 sudo apt install -y redis supervisor stunnel4 fail2ban ufw xpdf fonts-freefont-ttf python3-redis
 ```
 
-### Global
-
-```bash
-sudo mkdir /opt/tk-dashboard
-```
-
 ### Firewall 
 
 ```bash
@@ -31,11 +25,21 @@ sudo ufw enable
 # ...
 ```
 
+### Global
+
+```bash
+sudo mkdir /opt/tk-dashboard
+sudo mkdir /opt/tk-dashboard/ui-apps
+sudo mkdir /opt/tk-dashboard/io-apps
+```
+
 ### Loos UI (user interface)
 
 ```bash
 # copy
-cp -rv --dereference ui-apps/loos-board-ui/* /opt/tk-dashboard/loos-board-ui/
+sudo cp -rv  ui-apps/conf /opt/tk-dashboard/ui-apps/
+sudo cp -rv  ui-apps/lib /opt/tk-dashboard/ui-apps/
+sudo cp -rv  ui-apps/loos-ui-app.py /opt/tk-dashboard/ui-apps/
 ```
 
 ### Loos IO (input/output)
@@ -43,9 +47,11 @@ cp -rv --dereference ui-apps/loos-board-ui/* /opt/tk-dashboard/loos-board-ui/
 ```bash
 ## loos-export-io
 # copy
-sudo cp -rv --dereference io-apps/loos-export-io /opt/tk-dashboard/
+sudo cp -rv  io-apps/conf /opt/tk-dashboard/io-apps/
+sudo cp -rv  io-apps/lib /opt/tk-dashboard/io-apps/
+sudo cp -rv  io-apps/loos-* /opt/tk-dashboard/ui-apps/
 # init python venv
-sudo /opt/tk-dashboard/loos-export-io/venv_setup.sh
+sudo /opt/tk-dashboard/io-apps/loos-venv-setup.sh
 
 ## loos-import-io
 # copy
