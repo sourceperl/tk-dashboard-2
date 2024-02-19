@@ -3,8 +3,8 @@
 import logging
 import schedule
 import time
-from private_data import REDIS_USER, REDIS_PASS
-from dashboard_io import CustomRedis, catch_log_except
+from lib.dashboard_io import CustomRedis, catch_log_except
+from conf.private_loos import REDIS_USER, REDIS_PASS
 
 
 # some class

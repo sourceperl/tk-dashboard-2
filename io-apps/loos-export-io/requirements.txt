@@ -1,2 +1,0 @@
-schedule==1.2.1
-redis==5.0.1

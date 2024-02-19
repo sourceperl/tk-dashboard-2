@@ -13,7 +13,7 @@ if [ -d "$ENV_DIR" ]; then
 fi
 
 # init a new one
-if python -m venv "${ENV_DIR}";
+if python3 -m venv "${ENV_DIR}";
 then 
     echo "init new virtual environment in '${ENV_DIR}' OK"
 else
@@ -30,11 +30,7 @@ else
     exit 3
 fi
 
-# github token request (for private repo)
-echo "please enter github token:"
-read -s GITHUB_TOKEN
-
 # add some package(s) to venv
 echo "add required packages to the new virtual environment"
-pip install -U schedule==1.2.1
-pip install git+https://sourceperl:${GITHUB_TOKEN}@github.com/sourceperl/pyHMI.git
+pip install -U pip
+pip install -r "${SCRIPT_DIR}/loos-venv-requirements.txt"

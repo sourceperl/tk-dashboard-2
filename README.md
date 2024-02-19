@@ -8,7 +8,7 @@
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y redis supervisor stunnel fail2ban ufw xpdf fonts-freefont-ttf
+sudo apt install -y redis supervisor stunnel4 fail2ban ufw xpdf fonts-freefont-ttf
 ```
 
 ### Global

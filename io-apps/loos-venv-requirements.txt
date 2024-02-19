@@ -4,8 +4,9 @@ cryptography==42.0.3
 feedparser==6.0.11
 metar==1.11.0
 pdf2image==1.17.0
-pillow==10.2.0
+pillow>=9.5.0
 redis==5.0.1
 requests==2.31.0
 schedule==1.2.1
-urllib3==2.2.0
+urllib3>=2.0.7
+git+https://github.com/sourceperl/pyHMI.git@v0.0.18

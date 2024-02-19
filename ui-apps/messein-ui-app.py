@@ -4,11 +4,11 @@ import argparse
 import logging
 import tkinter as tk
 from tkinter import ttk
-from dashboard_ui import \
+from lib.dashboard_ui import \
     CustomRedis, Tag, TagsBase, Tab, PdfTab, Geometry, wait_uptime, \
     AirQualityTile, ClockTile, DaysAccTileMessein, FlysprayTile, GaugeTile, \
     ImageRawTile, ImageRawCarouselTile, NewsBannerTile, TwitterTile, VigilanceTile
-from private_data import REDIS_USER, REDIS_PASS
+from conf.private_messein import REDIS_USER, REDIS_PASS
 
 
 class DB:
