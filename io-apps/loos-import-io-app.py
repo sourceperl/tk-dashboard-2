@@ -1,3 +1,5 @@
+#!/opt/tk-dashboard/io-apps/venv/bin/python
+
 from datetime import datetime, timedelta
 import hashlib
 import io
@@ -8,6 +10,7 @@ import re
 import time
 from urllib.request import Request, urlopen
 from xml.dom import minidom
+import zlib
 from cryptography.fernet import Fernet, InvalidToken
 import feedparser
 import schedule
@@ -19,7 +22,7 @@ import PIL.Image
 import PIL.ImageDraw
 from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local
 from lib.webdav import WebDAV
-from conf.private_loos import REDIS_USER, REDIS_PASS, DWEET_URL, DWEET_KEY, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
+from conf.private_loos import REDIS_USER, REDIS_PASS, DWEET_THING, DWEET_KEY, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
     WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
 
 
@@ -81,7 +84,7 @@ def air_quality_atmo_hdf_job():
 @catch_log_except()
 def dweet_job():
     # request
-    uo_ret = urlopen(DWEET_URL, timeout=10.0)
+    uo_ret = urlopen(f'https://dweet.io/get/latest/dweet/for/{DWEET_THING}', timeout=10.0)
     dweet_msg = uo_ret.read()
     data_d = json.loads(dweet_msg)
     # check dweet success
@@ -89,7 +92,7 @@ def dweet_job():
         raise RuntimeError(f'dweet request failed with json: {data_d}')
     # search your raw message
     try:
-        raw_msg = data_d['with'][0]['content']['raw_flyspray_nord']
+        raw_msg = data_d['with'][0]['content']['fly_tne_raw']
     except (IndexError, KeyError):
         raise RuntimeError('key missing in dweet message')
     # check length or raw message
@@ -98,18 +101,24 @@ def dweet_job():
     # decrypt raw message (loses it's validity 20 mn after being encrypted)
     try:
         fernet = Fernet(key=DWEET_KEY)
-        plain_msg = fernet.decrypt(raw_msg, ttl=20*60)
+        msg_zip_plain = fernet.decrypt(raw_msg, ttl=20*60)
     except InvalidToken:
         raise RuntimeError('unable to decrypt message')
+    # decompress
+    msg_plain = zlib.decompress(msg_zip_plain)
     # check format
     try:
-        js_obj = json.loads(plain_msg)
+        js_obj = json.loads(msg_plain)
     except json.JSONDecodeError:
         raise RuntimeError('decrypt message is not a valid json')
-    if type(js_obj) is not list:
-        raise RuntimeError('json message is not a list')
+    if type(js_obj) is not dict:
+        raise RuntimeError('json message is not a dict')
+    try:
+        titles_l = list(js_obj['nord'])
+    except (TypeError, KeyError):
+        raise RuntimeError('key "nord" is missing or have bad type in json message')
     # if all is ok: publish json to redis
-    DB.main.set_as_json('json:flyspray-nord', js_obj, ex=3600)
+    DB.main.set_as_json('json:flyspray-nord', titles_l, ex=3600)
 
 
 @catch_log_except()
