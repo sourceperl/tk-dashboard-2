@@ -28,7 +28,7 @@ logging.getLogger('PIL').setLevel(logging.WARNING)
 
 
 # some const as class
-# default dashboard color (can be override)
+# dashboard color
 class Colors:
     # colors
     WHITE = '#eff0f1'
@@ -50,13 +50,12 @@ class Colors:
     NEWS_TXT = BLACK
 
 
-# geometry
+# dashboard geometry
 class Geometry:
-    NB_TILE_W = 17
-    NB_TILE_H = 9
-    TAB_PAD_HEIGHT = 17
+    NB_TILE_WIDTH = 17
+    NB_TILE_HEIGHT = 9
     TAB_PAD_WIDTH = 17
-    NEWS_BANNER_HEIGHT = 90
+    TAB_PAD_HEIGHT = 17
 
 
 # some function
@@ -238,12 +237,12 @@ class Tab(tk.Frame):
         tk.Frame.__init__(self, *args, **kwargs)
         # public
         self._update_ms = None
-        self.nb_tile_w = Geometry.NB_TILE_W
-        self.nb_tile_h = Geometry.NB_TILE_H
+        self.nb_tile_w = Geometry.NB_TILE_WIDTH
+        self.nb_tile_h = Geometry.NB_TILE_HEIGHT
         # private
         self._screen_w = self.winfo_screenwidth()
         self._screen_h = self.winfo_screenheight() - 60
-        self._lbl__padx = round(self._screen_w / (self.nb_tile_w * 2))
+        self._lbl_padx = round(self._screen_w / (self.nb_tile_w * 2))
         self._lbl_pady = round((self._screen_h - Geometry.TAB_PAD_HEIGHT) / (self.nb_tile_h * 2))
         # tk stuff
         # populate the grid with all tiles
@@ -251,7 +250,7 @@ class Tab(tk.Frame):
             for r in range(0, self.nb_tile_h):
                 self.grid_rowconfigure(r, weight=1)
                 # create Labels to space all of it
-                tk.Label(self, pady=self._lbl_pady, padx=self._lbl__padx).grid(column=c, row=r)
+                tk.Label(self, pady=self._lbl_pady, padx=self._lbl_padx).grid(column=c, row=r)
                 Tile(self).set_tile(row=r, column=c)
             self.grid_columnconfigure(c, weight=1)
         # init tab update
@@ -800,9 +799,9 @@ class ImageRawTile(Tile):
                 txt = 'n/a'
                 draw = PIL.ImageDraw.Draw(pil_img)
                 font = PIL.ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeMono.ttf', 24)
-                w, h = draw.textsize(txt, font=font)
-                x = (widget_size[0] - w) / 2
-                y = (widget_size[1] - h) / 2
+                left, top, right, bottom = draw.textbbox((0, 0), txt, font=font)
+                x = (widget_size[0] - (right - left)) / 2
+                y = (widget_size[1] - (bottom - top)) / 2
                 draw.text((x, y), txt, fill='black', font=font)
             # update image label
             self.tk_img = PIL.ImageTk.PhotoImage(pil_img)
@@ -930,9 +929,9 @@ class ImageRawCarouselTile(Tile):
                 txt = 'n/a'
                 draw = PIL.ImageDraw.Draw(pil_img)
                 font = PIL.ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeMono.ttf', 24)
-                w, h = draw.textsize(txt, font=font)
-                x = (widget_size[0] - w) / 2
-                y = (widget_size[1] - h) / 2
+                left, top, right, bottom = draw.textbbox((0, 0), txt, font=font)
+                x = (widget_size[0] - (right - left)) / 2
+                y = (widget_size[1] - (bottom - top)) / 2
                 draw.text((x, y), txt, fill='black', font=font)
             # update image label
             self.tk_img = PIL.ImageTk.PhotoImage(pil_img)
