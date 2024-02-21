@@ -48,6 +48,14 @@ def dt_utc_to_local(utc_dt):
     return utc_dt + offset
 
 
+def wait_uptime(min_s: float):
+    while True:
+        uptime = float(open('/proc/uptime', 'r').readline().split()[0])
+        if uptime > min_s:
+            break
+        time.sleep(0.1)
+
+
 def byte_xor(data_1: bytes, data_2: bytes) -> bytes:
     return bytes([a ^ b for a, b in zip(data_1, data_2)])
 

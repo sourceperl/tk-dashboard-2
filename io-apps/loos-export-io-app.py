@@ -3,7 +3,7 @@
 import logging
 import schedule
 import time
-from lib.dashboard_io import CustomRedis, catch_log_except
+from lib.dashboard_io import CustomRedis, catch_log_except, wait_uptime
 from conf.private_loos import REDIS_USER, REDIS_PASS
 
 
@@ -31,6 +31,10 @@ if __name__ == '__main__':
 
     # init scheduler
     schedule.every(2).minutes.do(loos_redis_export_job)
+    
+    # wait system ready (uptime > 25s)
+    wait_uptime(min_s=25.0)
+
     # first call
     loos_redis_export_job()
 

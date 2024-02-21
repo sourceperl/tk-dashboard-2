@@ -6,7 +6,7 @@ import schedule
 from pyHMI.DS_ModbusTCP import ModbusTCPDevice
 from pyHMI.DS_Redis import RedisDevice
 from pyHMI.Tag import Tag
-from lib.dashboard_io import catch_log_except
+from lib.dashboard_io import catch_log_except, wait_uptime
 from conf.private_loos import REDIS_USER, REDIS_PASS
 
 
@@ -116,6 +116,10 @@ if __name__ == '__main__':
     # init scheduler
     schedule.every(5).seconds.do(db_refresh_job)
     schedule.every().day.at('00:00').do(db_midnight_job)
+    
+    # wait system ready (uptime > 25s)
+    wait_uptime(min_s=25.0)
+
     # first call
     db_refresh_job()
 

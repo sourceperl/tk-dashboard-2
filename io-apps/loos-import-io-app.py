@@ -20,7 +20,7 @@ import pytz
 import pdf2image
 import PIL.Image
 import PIL.ImageDraw
-from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local
+from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local, wait_uptime
 from lib.webdav import WebDAV
 from conf.private_loos import REDIS_USER, REDIS_PASS, DWEET_THING, DWEET_KEY, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
     WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
@@ -505,6 +505,10 @@ if __name__ == '__main__':
     schedule.every(15).minutes.do(openweathermap_forecast_job)
     schedule.every(5).minutes.do(vigilance_job)
     schedule.every(5).minutes.do(weather_today_job)
+    
+    # wait system ready (uptime > 25s)
+    wait_uptime(min_s=25.0)
+    
     # first call
     air_quality_atmo_hdf_job()
     dweet_job()
