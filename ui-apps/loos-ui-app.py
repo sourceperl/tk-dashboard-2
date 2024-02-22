@@ -5,7 +5,7 @@ import logging
 import tkinter as tk
 from tkinter import ttk
 from lib.dashboard_ui import \
-    CustomRedis, Tag, TagsBase, Tab, PdfTab, Geometry, wait_uptime, \
+    CustomRedis, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
     AirQualityTile, ClockTile, DaysAccTileLoos, EmptyTile, GaugeTile, NewsBannerTile, \
     FlysprayTile, ImageRawTile, ImageRawCarouselTile, VigilanceTile, WattsTile, WeatherTile
 from conf.private_loos import REDIS_USER, REDIS_PASS
@@ -43,24 +43,18 @@ class Tags(TagsBase):
 class MainApp(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-        # public
-        # user idle timeout set to 15mn
-        self.user_idle_timeout_s = 900
-        # private
-        self._idle_timer = None
         # tk stuff
         # remove mouse icon in touchscreen mode (default)
         if not app_conf.cursor:
             self.config(cursor='none')
         # define style to fix size of tab header
         self.style = ttk.Style()
-        self.style.theme_settings('default',
-                                  {'TNotebook.Tab': {'configure': {'padding': [Geometry.TAB_PAD_WIDTH,
-                                                                               Geometry.TAB_PAD_HEIGHT]}}})
+        self.style.theme_settings('default', {'TNotebook.Tab': {'configure': {'padding': [17, 17]}}})
         # define notebook
         self.note = ttk.Notebook(self)
-        self.tab1 = LiveTab(self.note)
-        self.tab2 = PdfTab(self.note, list_tag=Tags.DIR_PDF_DOC_LIST, raw_tag=Tags.RAW_PDF_DOC_CONTENT)
+        self.tab1 = LiveTilesTab(self.note, tiles_size=(17, 9), update_ms=5000)
+        self.tab2 = PdfTilesTab(self.note, tiles_size=(17, 12), update_ms=5000,
+                                list_tag=Tags.DIR_PDF_DOC_LIST, raw_tag=Tags.RAW_PDF_DOC_CONTENT)
         self.note.add(self.tab1, text='Tableau de bord')
         self.note.add(self.tab2, text='Affichage réglementaire')
         self.note.pack()
@@ -71,27 +65,30 @@ class MainApp(tk.Tk):
         # bind function keys to tabs
         self.bind('<F1>', lambda evt: self.note.select(self.tab1))
         self.bind('<F2>', lambda evt: self.note.select(self.tab2))
+        # add an user idle timer (timeout set to 15mn)
+        self.user_idle_timeout_s = 15*60
+        # init idle timer
+        self._idle_timer = self.after(self.user_idle_timeout_s * 1000, self.on_user_idle)
         # bind function for manage user idle time
         self.bind_all('<Any-KeyPress>', self._trig_user_idle_t)
         self.bind_all('<Any-ButtonPress>', self._trig_user_idle_t)
 
     def _trig_user_idle_t(self, _evt):
         # cancel the previous event
-        if self._idle_timer is not None:
-            self.after_cancel(self._idle_timer)
+        self.after_cancel(self._idle_timer)
         # create new timer
-        self._idle_timer = self.after(self.user_idle_timeout_s * 1000, self._on_user_idle)
+        self._idle_timer = self.after(self.user_idle_timeout_s * 1000, self.on_user_idle)
 
-    def _on_user_idle(self):
+    def on_user_idle(self):
         # select first tab
         self.note.select(self.tab1)
 
 
-class LiveTab(Tab):
+class LiveTilesTab(TilesTab):
     """ Main dynamic Tab """
 
     def __init__(self, *args, **kwargs):
-        Tab.__init__(self, *args, **kwargs)
+        TilesTab.__init__(self, *args, **kwargs)
         # create all tiles for this tab here
         # logo Atmo HDF
         self.tl_img_atmo = ImageRawTile(self, bg='white')
@@ -162,15 +159,15 @@ class LiveTab(Tab):
         # carousel
         self.tl_crl = ImageRawCarouselTile(self, bg='white', raw_img_tag_d=Tags.DIR_CAROUSEL_RAW)
         self.tl_crl.set_tile(row=4, column=7, rowspan=4, columnspan=6)
-        # auto-update
-        self.start_cyclic_update(update_ms=5000)
+        # start auto-update
+        self.start_cyclic_update()
         # at startup:
         # trig update after 1s to let Tags io_thread populate values
         self.after(ms=1000, func=self.update)
 
     def update(self):
         # GRT wordcloud
-        #self.tl_img_cloud.raw_display = Tags.IMG_GRT_CLOUD.get()
+        # self.tl_img_cloud.raw_display = Tags.IMG_GRT_CLOUD.get()
         # traffic map
         self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
         # atmo

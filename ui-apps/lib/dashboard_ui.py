@@ -50,14 +50,6 @@ class Colors:
     NEWS_TXT = BLACK
 
 
-# dashboard geometry
-class Geometry:
-    NB_TILE_WIDTH = 17
-    NB_TILE_HEIGHT = 9
-    TAB_PAD_WIDTH = 17
-    TAB_PAD_HEIGHT = 17
-
-
 # some function
 def catch_log_except(catch=None, log_lvl=logging.ERROR, limit_arg_len=40):
     # decorator to catch exception and produce one line log message
@@ -228,26 +220,24 @@ class TagsBase:
 
 
 # Tab library
-class Tab(tk.Frame):
+class TilesTab(tk.Frame):
     """
     Base Tab class, with a frame full of tile, can be derived as you need it
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, tiles_size: tuple, update_ms:int=5000, **kwargs):
         tk.Frame.__init__(self, *args, **kwargs)
-        # public
-        self._update_ms = None
-        self.nb_tile_w = Geometry.NB_TILE_WIDTH
-        self.nb_tile_h = Geometry.NB_TILE_HEIGHT
         # private
+        self._tiles_size = tiles_size
+        self._update_ms = update_ms
         self._screen_w = self.winfo_screenwidth()
-        self._screen_h = self.winfo_screenheight() - 60
-        self._lbl_padx = round(self._screen_w / (self.nb_tile_w * 2))
-        self._lbl_pady = round((self._screen_h - Geometry.TAB_PAD_HEIGHT) / (self.nb_tile_h * 2))
+        self._screen_h = self.winfo_screenheight()
+        self._lbl_padx = round((self._screen_w / self.tiles_width) / 2)
+        self._lbl_pady = round((self._screen_h / self.tiles_height) / 2)
         # tk stuff
         # populate the grid with all tiles
-        for c in range(0, self.nb_tile_w):
-            for r in range(0, self.nb_tile_h):
+        for c in range(self.tiles_width):
+            for r in range(self.tiles_height):
                 self.grid_rowconfigure(r, weight=1)
                 # create Labels to space all of it
                 tk.Label(self, pady=self._lbl_pady, padx=self._lbl_padx).grid(column=c, row=r)
@@ -256,9 +246,16 @@ class Tab(tk.Frame):
         # init tab update
         self.bind('<Visibility>', lambda evt: self.update())
 
-    def start_cyclic_update(self, update_ms=500):
-        self._update_ms = update_ms
-        # init loop
+    @property
+    def tiles_width(self):
+        return self._tiles_size[0]
+
+    @property
+    def tiles_height(self):
+        return self._tiles_size[1]
+
+    def start_cyclic_update(self):
+        """init update loop (call this after tab build)"""
         self._do_cyclic_update()
 
     def _do_cyclic_update(self):
@@ -270,17 +267,17 @@ class Tab(tk.Frame):
         pass
 
 
-class PdfTab(Tab):
-    def __init__(self, *args, list_tag, raw_tag, **kwargs):
-        Tab.__init__(self, *args, **kwargs)
+class PdfTilesTab(TilesTab):
+    def __init__(self, *args, list_tag: Tag, raw_tag: Tag, **kwargs):
+        TilesTab.__init__(self, *args, **kwargs)
         # public
         self.list_tag = list_tag
         self.raw_tag = raw_tag
         # private
         self._file_l = list()
         self._widgets_l = list()
-        # auto-update every 5s
-        self.start_cyclic_update(update_ms=5000)
+        # start auto-update
+        self.start_cyclic_update()
 
     @property
     def file_list(self):
@@ -319,7 +316,7 @@ class PdfTab(Tab):
             if not self._file_l:
                 # display error message "n/a"
                 msg_tl = MessageTile(self)
-                msg_tl.set_tile(row=0, column=0, rowspan=self.nb_tile_h, columnspan=self.nb_tile_w)
+                msg_tl.set_tile(row=0, column=0, rowspan=self.tiles_height, columnspan=self.tiles_height)
                 msg_tl.tk_str_msg.set('n/a')
                 self._widgets_l.append(msg_tl)
             else:
@@ -328,14 +325,12 @@ class PdfTab(Tab):
                 (r, c) = (0, 1)
                 for file_name in self._file_l:
                     # place PdfLauncherTile at (r,c)
-                    launch_tile = PdfLauncherTile(self,
-                                                  file=file_name,
-                                                  raw_tag=self.raw_tag)
+                    launch_tile = PdfLauncherTile(self, file=file_name, raw_tag=self.raw_tag)
                     launch_tile.set_tile(row=r, column=c, columnspan=5, rowspan=1)
                     self._widgets_l.append(launch_tile)
                     # set next place
                     c += 5
-                    if c >= self.nb_tile_w - 1:
+                    if c >= self.tiles_width - 1:
                         r += 1
                         c = 1
         except Exception:
