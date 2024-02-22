@@ -5,9 +5,9 @@ import logging
 import tkinter as tk
 from tkinter import ttk
 from lib.dashboard_ui import \
-    CustomRedis, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
+    CustomRedis, EmptyTile, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
     AirQualityTile, ClockTile, DaysAccTileMessein, FlysprayTile, GaugeTile, \
-    ImageRawTile, ImageRawCarouselTile, NewsBannerTile, TwitterTile, VigilanceTile
+    ImageRawTile, ImageRawCarouselTile, NewsBannerTile, VigilanceTile
 from conf.private_messein import REDIS_USER, REDIS_PASS
 
 
@@ -26,19 +26,17 @@ class Tags(TagsBase):
     D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
     D_NEWS_LOCAL = Tag(read=lambda: DB.main.get_js('json:news'), io_every=2.0)
-    D_TWEETS_GRT = Tag(read=lambda: DB.main.get_js('from:loos:json:tweets:@grtgaz'), io_every=2.0)
     L_FLYSPRAY_RSS = Tag(read=lambda: DB.main.get_js('from:loos:json:flyspray-est'), io_every=2.0)
     IMG_ATMO_GE = Tag(read=lambda: DB.main.get('img:static:logo-atmo-ge:png'), io_every=10.0)
     IMG_LOGO_GRT = Tag(read=lambda: DB.main.get('img:static:logo-grt:png'), io_every=10.0)
-    IMG_GRT_CLOUD = Tag(read=lambda: DB.main.get('from:loos:img:grt-twitter-cloud:png'), io_every=10.0)
     IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
     IMG_DIR_CAM_HOUDEMONT = Tag(read=lambda: DB.main.get('img:dir-est:houdemont:png'), io_every=10.0)
     IMG_DIR_CAM_VELAINE = Tag(read=lambda: DB.main.get('img:dir-est:velaine:png'), io_every=10.0)
     IMG_DIR_CAM_ST_NICOLAS = Tag(read=lambda: DB.main.get('img:dir-est:st-nicolas:png'), io_every=10.0)
     IMG_DIR_CAM_FLAVIGNY = Tag(read=lambda: DB.main.get('img:dir-est:flavigny:png'), io_every=10.0)
     DIR_CAROUSEL_RAW = Tag(read=lambda: DB.main.hgetall('dir:carousel:raw:min-png'), io_every=10.0)
-    DIR_PDF_DOC_LIST = Tag(read=lambda: map(bytes.decode, DB.main.hkeys('dir:doc:raw')))
-    RAW_PDF_DOC_CONTENT = Tag(read=lambda file: DB.main.hget('dir:doc:raw', file))
+    PDF_FILENAMES_L = Tag(read=lambda: map(bytes.decode, DB.main.hkeys('dir:doc:raw')))
+    PDF_CONTENT = Tag(read=lambda file: DB.main.hget('dir:doc:raw', file))
 
 
 class MainApp(tk.Tk):
@@ -55,7 +53,7 @@ class MainApp(tk.Tk):
         self.note = ttk.Notebook(self)
         self.tab1 = LiveTilesTab(self.note, tiles_size=(17, 9), update_ms=5000)
         self.tab2 = PdfTilesTab(self.note, tiles_size=(17, 9), update_ms=5000,
-                                list_tag=Tags.DIR_PDF_DOC_LIST, raw_tag=Tags.RAW_PDF_DOC_CONTENT)
+                                list_tag=Tags.PDF_FILENAMES_L, raw_tag=Tags.PDF_CONTENT)
         self.note.add(self.tab1, text='Tableau de bord')
         self.note.add(self.tab2, text='Affichage réglementaire')
         self.note.pack()
@@ -124,9 +122,6 @@ class LiveTilesTab(TilesTab):
         # clock
         self.tl_clock = ClockTile(self)
         self.tl_clock.set_tile(row=0, column=13, rowspan=2, columnspan=4)
-        # twitter cloud img
-        self.tl_img_cloud = ImageRawTile(self, bg='black')
-        self.tl_img_cloud.set_tile(row=2, column=5, rowspan=2, columnspan=3)
         # news banner
         self.tl_news = NewsBannerTile(self)
         self.tl_news.set_tile(row=8, column=0, columnspan=17)
@@ -160,9 +155,6 @@ class LiveTilesTab(TilesTab):
         # acc days stat
         self.tl_acc = DaysAccTileMessein(self)
         self.tl_acc.set_tile(row=2, column=13, columnspan=4, rowspan=1)
-        # twitter
-        self.tl_tw_live = TwitterTile(self)
-        self.tl_tw_live.set_tile(row=2, column=8, columnspan=5, rowspan=2)
         # logo img
         self.tl_img_grt = ImageRawTile(self, bg='white')
         self.tl_img_grt.set_tile(row=6, column=13, rowspan=2, columnspan=4)
@@ -176,8 +168,6 @@ class LiveTilesTab(TilesTab):
         self.after(ms=1000, func=self.update)
 
     def update(self):
-        # GRT wordcloud
-        self.tl_img_cloud.raw_display = Tags.IMG_GRT_CLOUD.get()
         # traffic map
         self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
         # atmo
@@ -191,8 +181,6 @@ class LiveTilesTab(TilesTab):
         self.tl_img_flavigny.raw_display = Tags.IMG_DIR_CAM_FLAVIGNY.get()
         # acc days stat
         self.tl_acc.acc_date_dts = Tags.D_GSHEET_GRT.get(('tags', 'DATE_ACC_DTS'))
-        # twitter
-        self.tl_tw_live.l_tweet = Tags.D_TWEETS_GRT.get('tweets')
         # air Nancy
         self.tl_atmo_nancy.qlt_index = Tags.D_ATMO_QUALITY.get('nancy')
         # air Metz
@@ -201,7 +189,12 @@ class LiveTilesTab(TilesTab):
         self.tl_atmo_reims.qlt_index = Tags.D_ATMO_QUALITY.get('reims')
         # air Strasbourg
         self.tl_atmo_stras.qlt_index = Tags.D_ATMO_QUALITY.get('strasbourg')
-        # update news widget
+        # empty area(s)
+        self.tl_empty1 = EmptyTile(self)
+        self.tl_empty1.set_tile(row=2, column=5, rowspan=2, columnspan=8)
+        self.tl_empty2 = EmptyTile(self)
+        self.tl_empty2.set_tile(row=4, column=5, rowspan=1, columnspan=2)
+        # news banner
         self.tl_news.l_titles = Tags.D_NEWS_LOCAL.get()
         # gauges update
         self.tl_g_veh.percent = Tags.D_GSHEET_GRT.get(('tags', 'IGP_VEH_JAUGE_DTS'))

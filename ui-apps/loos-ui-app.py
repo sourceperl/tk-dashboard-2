@@ -36,8 +36,8 @@ class Tags(TagsBase):
     IMG_LOGO_GRT = Tag(read=lambda: DB.main.get('img:static:logo-grt:png'), io_every=10.0)
     IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
     DIR_CAROUSEL_RAW = Tag(read=lambda: DB.main.hgetall('dir:carousel:raw:min-png'), io_every=10.0)
-    DIR_PDF_DOC_LIST = Tag(read=lambda: map(bytes.decode, DB.main.hkeys('dir:doc:raw')))
-    RAW_PDF_DOC_CONTENT = Tag(read=lambda file: DB.main.hget('dir:doc:raw', file))
+    PDF_FILENAMES_L = Tag(read=lambda: map(bytes.decode, DB.main.hkeys('dir:doc:raw')))
+    PDF_CONTENT = Tag(read=lambda file: DB.main.hget('dir:doc:raw', file))
 
 
 class MainApp(tk.Tk):
@@ -54,7 +54,7 @@ class MainApp(tk.Tk):
         self.note = ttk.Notebook(self)
         self.tab1 = LiveTilesTab(self.note, tiles_size=(17, 9), update_ms=5000)
         self.tab2 = PdfTilesTab(self.note, tiles_size=(17, 12), update_ms=5000,
-                                list_tag=Tags.DIR_PDF_DOC_LIST, raw_tag=Tags.RAW_PDF_DOC_CONTENT)
+                                list_tag=Tags.PDF_FILENAMES_L, raw_tag=Tags.PDF_CONTENT)
         self.note.add(self.tab1, text='Tableau de bord')
         self.note.add(self.tab2, text='Affichage réglementaire')
         self.note.pack()
@@ -114,7 +114,7 @@ class LiveTilesTab(TilesTab):
         # clock
         self.tl_clock = ClockTile(self)
         self.tl_clock.set_tile(row=0, column=5, rowspan=2, columnspan=3)
-        # empty
+        # empty area(s)
         self.tl_empty = EmptyTile(self)
         self.tl_empty.set_tile(row=2, column=5, rowspan=2, columnspan=8)
         # news banner
@@ -166,8 +166,6 @@ class LiveTilesTab(TilesTab):
         self.after(ms=1000, func=self.update)
 
     def update(self):
-        # GRT wordcloud
-        # self.tl_img_cloud.raw_display = Tags.IMG_GRT_CLOUD.get()
         # traffic map
         self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
         # atmo

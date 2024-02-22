@@ -225,7 +225,7 @@ class TilesTab(tk.Frame):
     Base Tab class, with a frame full of tile, can be derived as you need it
     """
 
-    def __init__(self, *args, tiles_size: tuple, update_ms:int=5000, **kwargs):
+    def __init__(self, *args, tiles_size: tuple, update_ms: int = 5000, **kwargs):
         tk.Frame.__init__(self, *args, **kwargs)
         # private
         self._tiles_size = tiles_size
