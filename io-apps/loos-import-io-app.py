@@ -1,6 +1,6 @@
 #!/opt/tk-dashboard/io-apps/venv/bin/python
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
@@ -9,21 +9,19 @@ import os
 import re
 import time
 from urllib.request import Request, urlopen
-from xml.dom import minidom
 import zlib
 from cryptography.fernet import Fernet, InvalidToken
 import feedparser
 import schedule
 import PIL.Image
 from metar.Metar import Metar
-import pytz
 import pdf2image
 import PIL.Image
 import PIL.ImageDraw
 from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local, wait_uptime
 from lib.webdav import WebDAV
 from conf.private_loos import REDIS_USER, REDIS_PASS, DWEET_THING, DWEET_KEY, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
-    WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
+    VIGILANCE_KEY, WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
 
 
 # some const
@@ -408,38 +406,43 @@ def owc_sync_doc_job():
 
 @catch_log_except()
 def vigilance_job():
-    # request XML data from server
-    uo_ret = urlopen('http://vigilance.meteofrance.com/data/NXFR34_LFPW_.xml', timeout=10.0)
-    # dom parsing (convert UTF-8 r.text to XML char)
-    dom = minidom.parseString(uo_ret.read().decode().encode('ascii', 'xmlcharrefreplace'))
-    # set dict for dep data
-    vig_data = {'update': '', 'department': {}}
-    # map build date
-    tz = pytz.timezone('Europe/Paris')
-    map_date = str(dom.getElementsByTagName('entetevigilance')[0].getAttribute('dateinsert'))
-    map_dt = tz.localize(datetime(int(map_date[0:4]), int(map_date[4:6]),
-                                  int(map_date[6:8]), int(map_date[8:10]),
-                                  int(map_date[10:12])))
-    vig_data['update'] = map_dt.isoformat()
-    # parse every departments
-    for items in dom.getElementsByTagName('datavigilance'):
-        # current department
-        dep_code = str(items.attributes['dep'].value)
-        # get risk ID  if exist
-        risk_id = []
-        for risk in items.getElementsByTagName('risque'):
-            risk_id.append(int(risk.attributes['valeur'].value))
-        # get flood ID if exist
-        flood_id = None
-        for flood in items.getElementsByTagName('crue'):
-            flood_id = int(flood.attributes['valeur'].value)
-        # get color ID
-        color_id = int(items.attributes['couleur'].value)
-        # build vig_data
-        vig_data['department'][dep_code] = {'vig_level': color_id,
-                                            'flood_level': flood_id,
-                                            'risk_id': risk_id}
-    DB.main.set_as_json('json:vigilance', vig_data, ex=2*3600)
+    # request json data from public-api.meteofrance.fr
+    request = Request(url='https://public-api.meteofrance.fr/public/DPVigilance/v1/cartevigilance/encours',
+                      headers={'apikey': VIGILANCE_KEY})
+    uo_ret = urlopen(request, timeout=10.0)
+    # decode json message
+    vig_raw_d = json.load(uo_ret)
+    # check header
+    js_update_iso_str = vig_raw_d['product']['update_time']
+    js_update_dt = datetime.fromisoformat(js_update_iso_str)
+    since_update = datetime.now().astimezone(tz=timezone.utc) - js_update_dt
+    # skip outdated json (24h old)
+    if since_update.total_seconds() > 24 * 3600:
+        raise RuntimeError(f'json message outdated (update="{js_update_iso_str}")')    
+    # init a dict for publication
+    vig_d = {'update': js_update_iso_str, 'department': {}}
+    # parse data structure    
+    for period_d in vig_raw_d['product']['periods']:
+        # keep only J echeance, ignore J1
+        if period_d['echeance'] == 'J':
+            # populate vig_d with current vig level and list of risk at this level
+            for domain_id_d in period_d['timelaps']['domain_ids']:
+                # keep and format main infos
+                domain_id = domain_id_d['domain_id']
+                max_color_id = int(domain_id_d['max_color_id'])
+                risk_id_l = []
+                for ph_item_d in domain_id_d['phenomenon_items']:
+                    # ignore risks at green vig level
+                    if max_color_id > 1 :
+                        # keep only risk_id if greater or equal of current level
+                        if ph_item_d['phenomenon_max_color_id'] >= max_color_id:
+                            risk_id_l.append(int(ph_item_d['phenomenon_id']))
+                # apply to vig_d
+                vig_d['department'][domain_id] = {}
+                vig_d['department'][domain_id]['vig_level'] = max_color_id
+                vig_d['department'][domain_id]['risk_id'] = risk_id_l
+    # publish vig_d
+    DB.main.set_as_json('json:vigilance', vig_d, ex=2*3600)
 
 
 @catch_log_except()
@@ -508,7 +511,7 @@ if __name__ == '__main__':
     
     # wait system ready (uptime > 25s)
     wait_uptime(min_s=25.0)
-    
+
     # first call
     air_quality_atmo_hdf_job()
     dweet_job()

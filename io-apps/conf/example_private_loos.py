@@ -10,6 +10,8 @@ GMAP_IMG_URL = ''
 GSHEET_URL= ''
 # openweathermap
 OW_APP_ID = ''
+# vigilance meteo
+VIGILANCE_KEY = ''
 # webdav
 WEBDAV_URL = ''
 WEBDAV_USER = ''

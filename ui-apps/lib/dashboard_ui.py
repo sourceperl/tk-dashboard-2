@@ -1153,7 +1153,7 @@ class TwitterTile(Tile):
 class VigilanceTile(Tile):
     VIG_LVL = ['verte', 'jaune', 'orange', 'rouge']
     VIG_COLOR = [Colors.GREEN, Colors.YELLOW, Colors.ORANGE, Colors.RED]
-    ID_RISK = ['n/a', 'vent', 'pluie', 'orages', 'inondation', 'neige verglas',
+    ID_RISK = ['n/a', 'vent', 'pluie', 'orages', 'crues', 'neige/verglas',
                'canicule', 'grand froid', 'avalanches', 'submersion']
 
     def __init__(self, *args, department='', **kwargs):
