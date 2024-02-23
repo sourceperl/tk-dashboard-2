@@ -122,7 +122,7 @@ def dweet_job():
 @catch_log_except()
 def gsheet_job():
     # https request
-    uo_ret = urlopen(GSHEET_URL, timeout=5.0)
+    uo_ret = urlopen(GSHEET_URL, timeout=10.0)
     # process response
     d = dict()
     for line in uo_ret.read().decode().splitlines():

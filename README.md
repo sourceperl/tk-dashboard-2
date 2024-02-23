@@ -49,7 +49,7 @@ sudo cp -rv  ui-apps/loos-ui-app.py /opt/tk-dashboard/ui-apps/
 # copy
 sudo cp -rv  io-apps/conf /opt/tk-dashboard/io-apps/
 sudo cp -rv  io-apps/lib /opt/tk-dashboard/io-apps/
-sudo cp -rv  io-apps/loos-* /opt/tk-dashboard/ui-apps/
+sudo cp -rv  io-apps/loos-* /opt/tk-dashboard/io-apps/
 # init python venv
 sudo /opt/tk-dashboard/io-apps/loos-venv-setup.sh
 
