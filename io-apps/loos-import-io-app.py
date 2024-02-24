@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import ssl
 import time
 from urllib.request import Request, urlopen
 import zlib
@@ -493,8 +494,13 @@ if __name__ == '__main__':
     logging.getLogger('PIL').setLevel(logging.INFO)
     logging.info('board-import-app started')
 
-    # init webdav client
-    wdv = WebDAV(WEBDAV_URL, username=WEBDAV_USER, password=WEBDAV_PASS)
+    # init webdav client (with specific SSL context)
+    wdv_ssl_ctx = ssl.create_default_context()
+    wdv_ssl_ctx.check_hostname = False
+    wdv_ssl_ctx.verify_mode = ssl.CERT_NONE
+    # TODO replace above SSL context by self-signed server cert
+    #wdv_ssl_ctx.load_verify_locations('conf/cert/my-srv-cert.pem')
+    wdv = WebDAV(WEBDAV_URL, username=WEBDAV_USER, password=WEBDAV_PASS, ssl_ctx=wdv_ssl_ctx)
 
     # init scheduler
     schedule.every(5).minutes.do(owc_updated_job)

@@ -1,5 +1,5 @@
 from base64 import b64encode
-import ssl
+from ssl import SSLContext
 from urllib.parse import urljoin, urlparse, quote, unquote
 from urllib.request import Request, urlopen
 from xml.dom import minidom
@@ -22,24 +22,22 @@ class WebDAVError(Exception):
 
 
 class WebDAV:
-    def __init__(self, url: str, username: str = '', password: str = '', timeout: float = 5.0):
+    def __init__(self, url: str, username: str = '', password: str = '', 
+                 ssl_ctx: SSLContext = None, timeout: float = 5.0):
         # public
         self.url = url
         self.timeout = timeout
         self.last_http_code = 0
+        # ssl context
+        self.ssl_ctx = ssl_ctx
         # auth
         b64_credential = b64encode(f'{username}:{password}'.encode()).decode()
         self._base_headers_d = {'Authorization': f'Basic {b64_credential}'}
-        # ssl context with certificate verfication disabled
-        ctx_ssl = ssl.create_default_context()
-        ctx_ssl.check_hostname = False
-        ctx_ssl.verify_mode = ssl.CERT_NONE
-        self._ctx_ssl = ctx_ssl
 
     def upload(self, file_path: str, content: bytes = b'') -> None:
         # do request
         req = Request(urljoin(self.url, quote(file_path)), data=content, headers=self._base_headers_d, method='PUT')
-        uo_ret = urlopen(req, timeout=self.timeout, context=self._ctx_ssl)
+        uo_ret = urlopen(req, timeout=self.timeout, context=self.ssl_ctx)
         self.last_http_code = uo_ret.status
         # raise WebDAVError if request failed
         # HTTP_CREATED => create file, HTTP_NO_CONTENT => update an existing file
@@ -49,7 +47,7 @@ class WebDAV:
     def download(self, file_path: str) -> bytes:
         # do request
         req = Request(urljoin(self.url, quote(file_path)), headers=self._base_headers_d, method='GET')
-        uo_ret = urlopen(req, timeout=self.timeout, context=self._ctx_ssl)
+        uo_ret = urlopen(req, timeout=self.timeout, context=self.ssl_ctx)
         self.last_http_code = uo_ret.status
         # return file content if success, raise WebDAVError if request failed
         if uo_ret.status == HTTP_OK:
@@ -60,7 +58,7 @@ class WebDAV:
     def delete(self, file_path: str) -> None:
         # do request
         req = Request(urljoin(self.url, quote(file_path)), headers=self._base_headers_d, method='DELETE')
-        uo_ret = urlopen(req, timeout=self.timeout, context=self._ctx_ssl)
+        uo_ret = urlopen(req, timeout=self.timeout, context=self.ssl_ctx)
         self.last_http_code = uo_ret.status
         # raise WebDAVError if request failed
         if uo_ret.status != HTTP_NO_CONTENT:
@@ -69,7 +67,7 @@ class WebDAV:
     def mkdir(self, dir_path: str) -> None:
         # do request
         req = Request(urljoin(self.url, quote(dir_path)), headers=self._base_headers_d, method='MKCOL')
-        uo_ret = urlopen(req, timeout=self.timeout, context=self._ctx_ssl)
+        uo_ret = urlopen(req, timeout=self.timeout, context=self.ssl_ctx)
         self.last_http_code = uo_ret.status
         # raise WebDAVError if request failed
         if uo_ret.status != HTTP_CREATED:
@@ -87,15 +85,14 @@ class WebDAV:
         # request
         req = Request(urljoin(self.url, quote(path)), data=propfind_req.encode(),
                       headers=req_headers_d, method='PROPFIND')
-        uo_ret = urlopen(req, timeout=self.timeout, context=self._ctx_ssl)
+        uo_ret = urlopen(req, timeout=self.timeout, context=self.ssl_ctx)
         self.last_http_code = uo_ret.status
         # check result
-        if self.last_http_code == HTTP_MULTI_STATUS:
+        if uo_ret.status == HTTP_MULTI_STATUS:
             # return a list of dict
             results_l = []
             # parse XML
-            # dom = minidom.parseString(r.text.encode('ascii', 'xmlcharrefreplace'))
-            dom = minidom.parseString(uo_ret.read())  # .encode('ascii', 'xmlcharrefreplace'))
+            dom = minidom.parseString(uo_ret.read())
             # for every d:response
             for response in dom.getElementsByTagName('d:response'):
                 # in d:response/d:propstat/d:prop
