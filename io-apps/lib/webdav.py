@@ -23,7 +23,7 @@ class WebDAVError(Exception):
 
 class WebDAV:
     def __init__(self, url: str, username: str = '', password: str = '', 
-                 ssl_ctx: SSLContext = None, timeout: float = 5.0):
+                 ssl_ctx: SSLContext = None, timeout: float = 10.0):
         # public
         self.url = url
         self.timeout = timeout
