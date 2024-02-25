@@ -225,15 +225,16 @@ class TilesTab(tk.Frame):
     Base Tab class, with a frame full of tile, can be derived as you need it
     """
 
-    def __init__(self, *args, tiles_size: tuple, update_ms: int = 5000, **kwargs):
+    def __init__(self, *args, tiles_size: tuple, **kwargs):
         tk.Frame.__init__(self, *args, **kwargs)
         # private
         self._tiles_size = tiles_size
-        self._update_ms = update_ms
         self._screen_w = self.winfo_screenwidth()
         self._screen_h = self.winfo_screenheight()
         self._lbl_padx = round((self._screen_w / self.tiles_width) / 2)
         self._lbl_pady = round((self._screen_h / self.tiles_height) / 2)
+        self._update_every_ms = None
+        self._update_after_id = None
         # tk stuff
         # populate the grid with all tiles
         for c in range(self.tiles_width):
@@ -254,14 +255,22 @@ class TilesTab(tk.Frame):
     def tiles_height(self):
         return self._tiles_size[1]
 
-    def start_cyclic_update(self):
-        """init update loop (call this after tab build)"""
-        self._do_cyclic_update()
+    def init_cyclic_update(self, every_ms: int = None):
+        # keep
+        self._update_every_ms = every_ms
+        # cancel previous cyclic loop if already set
+        if self._update_after_id:
+            self.after_cancel(self._update_after_id)
+        # init loop
+        if self._update_every_ms:
+            self._do_cyclic_update()
 
     def _do_cyclic_update(self):
+        # call update() if this tab is currently displayed
         if self.winfo_ismapped():
             self.update()
-        self.after(self._update_ms, self._do_cyclic_update)
+        # set next periodic call
+        self._update_after_id = self.after(self._update_every_ms, self._do_cyclic_update)
 
     def update(self):
         pass
@@ -277,7 +286,7 @@ class PdfTilesTab(TilesTab):
         self._file_l = list()
         self._widgets_l = list()
         # start auto-update
-        self.start_cyclic_update()
+        self.init_cyclic_update(every_ms=5_000)
 
     @property
     def file_list(self):
@@ -346,9 +355,9 @@ class Tile(tk.Frame):
 
     def __init__(self, *args, **kwargs):
         tk.Frame.__init__(self, *args, **kwargs)
-        # public
         # private
-        self._update_ms = None
+        self._update_every_ms = None
+        self._update_after_id = None
         # tk stuff
         self.configure(highlightbackground=Colors.TILE_BORDER)
         self.configure(highlightthickness=3)
@@ -364,17 +373,22 @@ class Tile(tk.Frame):
         # function to print a tile on the screen at the given coordonates
         self.grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan, sticky=tk.NSEW)
 
-    def start_cyclic_update(self, update_ms=500):
-        self._update_ms = update_ms
-        # first update
-        self.update()
+    def init_cyclic_update(self, every_ms: int = None):
+        # keep
+        self._update_every_ms = every_ms
+        # cancel previous cyclic loop if already set
+        if self._update_after_id:
+            self.after_cancel(self._update_after_id)
         # init loop
-        self._do_cyclic_update()
+        if self._update_every_ms:
+            self._do_cyclic_update()
 
     def _do_cyclic_update(self):
+        # call update() if this tile is currently displayed
         if self.winfo_ismapped():
             self.update()
-        self.after(self._update_ms, self._do_cyclic_update)
+        # set next periodic call
+        self._update_after_id = self.after(self._update_every_ms, self._do_cyclic_update)
 
     def update(self):
         pass
@@ -442,7 +456,6 @@ class AirQualityTile(Tile):
 class ClockTile(Tile):
     def __init__(self, *args, **kwargs):
         Tile.__init__(self, *args, **kwargs)
-        # public
         # private
         self._date_str = tk.StringVar()
         self._time_str = tk.StringVar()
@@ -453,8 +466,8 @@ class ClockTile(Tile):
                  justify=tk.LEFT, fg=Colors.TXT).pack(expand=True)
         tk.Label(self, textvariable=self._time_str, font=('digital-7', 30), bg=self.cget('bg'),
                  fg=Colors.TXT).pack(expand=True)
-        # auto-update clock
-        self.start_cyclic_update(update_ms=500)
+        # auto-update clock every 500ms
+        self.init_cyclic_update(every_ms=500)
 
     def update(self):
         self._date_str.set(datetime.now().strftime('%A %d %B %Y'))
@@ -464,7 +477,6 @@ class ClockTile(Tile):
 class DaysAccTileLoos(Tile):
     def __init__(self, *args, **kwargs):
         Tile.__init__(self, *args, **kwargs)
-        # public
         # private
         self._acc_date_dts = None
         self._acc_date_digne = None
@@ -492,8 +504,8 @@ class DaysAccTileLoos(Tile):
                  bg=self.cget('bg'), fg=Colors.H_TXT).grid(row=2, column=0)
         tk.Label(self, text='jours sans accident DIGNE',
                  font=('courier', 18, 'bold'), bg=self.cget('bg'), fg=Colors.TXT).grid(row=2, column=1, sticky=tk.W)
-        # auto-update acc day counter
-        self.start_cyclic_update(update_ms=5000)
+        # auto-update acc day counter every 5s
+        self.init_cyclic_update(every_ms=5_000)
 
     @property
     def acc_date_dts(self):
@@ -547,7 +559,6 @@ class DaysAccTileLoos(Tile):
 class DaysAccTileMessein(Tile):
     def __init__(self, *args, **kwargs):
         Tile.__init__(self, *args, **kwargs)
-        # public
         # private
         self._acc_date_dts = None
         self._acc_date_digne = None
@@ -569,8 +580,8 @@ class DaysAccTileMessein(Tile):
                  bg=self.cget('bg'), fg=Colors.H_TXT).grid(row=1, column=0)
         tk.Label(self, text='jours sans accident DTS',
                  font=('courier', 14, 'bold'), bg=self.cget('bg'), fg=Colors.TXT).grid(row=1, column=1, sticky=tk.W)
-        # auto-update acc day counter
-        self.start_cyclic_update(update_ms=5000)
+        # auto-update acc day counter every 5s
+        self.init_cyclic_update(every_ms=5_000)
 
     @property
     def acc_date_dts(self):
@@ -749,7 +760,7 @@ class GaugeTile(Tile):
 
 
 class ImageTile(Tile):
-    def __init__(self, *args, file='', img_ratio=1, **kwargs):
+    def __init__(self, *args, file='', img_ratio: int = 1, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         # tk job
         self.tk_img = tk.PhotoImage()
@@ -806,17 +817,28 @@ class ImageRawTile(Tile):
 
 
 class ImageRefreshTile(Tile):
-    def __init__(self, *args, file, img_ratio=1, refresh_rate=5000, **kwargs):
+    def __init__(self, *args, file, img_ratio: int = 1, refresh_ms: int = 5_000, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         # public
         self.file = file
         self.img_ratio = img_ratio
+        # private
+        self._refresh_ms = None
         # tk job
         self.tk_img = tk.PhotoImage()
         self.lbl_img = tk.Label(self, bg=self.cget('bg'))
         self.lbl_img.pack(expand=True)
-        # auto-update clock
-        self.start_cyclic_update(update_ms=refresh_rate)
+        # set refresh property at end of Tile init (avoid update() crash)
+        self.refresh_ms = refresh_ms
+
+    @property
+    def refresh_ms(self):
+        return self._refresh_ms
+
+    @refresh_ms.setter
+    def refresh_ms(self, value):
+        self._refresh_ms = value
+        self.init_cyclic_update(every_ms=self._refresh_ms)
 
     def update(self):
         # display current image file
@@ -831,7 +853,7 @@ class ImageRefreshTile(Tile):
 
 
 class ImageCarouselTile(Tile):
-    def __init__(self, *args, img_path, refresh_rate=20000, **kwargs):
+    def __init__(self, *args, img_path: str, refresh_ms: int = 20_000, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         # public
         self.img_path = img_path
@@ -839,6 +861,7 @@ class ImageCarouselTile(Tile):
         self._img_index = 0
         self._img_files = list()
         self._skip_update_cnt = 0
+        self._refresh_ms = None
         # tk job
         self.configure(bg='white')
         self.tk_img = tk.PhotoImage()
@@ -849,8 +872,17 @@ class ImageCarouselTile(Tile):
         # bind function for skip update
         self.bind('<Button-1>', self._on_click)
         self.lbl_img.bind('<Button-1>', self._on_click)
-        # auto-update carousel rotate
-        self.start_cyclic_update(update_ms=refresh_rate)
+        # set refresh property at end of Tile init (avoid update() crash)
+        self.refresh_ms = refresh_ms
+
+    @property
+    def refresh_ms(self):
+        return self._refresh_ms
+
+    @refresh_ms.setter
+    def refresh_ms(self, value):
+        self._refresh_ms = value
+        self.init_cyclic_update(every_ms=self._refresh_ms)
 
     def update(self):
         # display next image or skip this if skip counter is set
@@ -884,13 +916,14 @@ class ImageCarouselTile(Tile):
 
 
 class ImageRawCarouselTile(Tile):
-    def __init__(self, *args, raw_img_tag_d, change_rate_s=20.0, **kwargs):
+    def __init__(self, *args, raw_img_tag_d: Tag, change_s: float = 20.0, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         # public
         self.raw_img_tag_d = raw_img_tag_d
         # private
         self._playlist = list()
         self._skip_update_cnt = 0
+        self._change_s = None
         # tk widget init
         # don't remove tk_img: keep a ref to avoid del by garbage collect
         self.tk_img = tk.PhotoImage()
@@ -899,10 +932,19 @@ class ImageRawCarouselTile(Tile):
         # bind function for skip update
         self.bind('<Button-1>', self._on_click)
         self.lbl_img.bind('<Button-1>', self._on_click)
-        # auto-update carousel rotate
-        self.start_cyclic_update(update_ms=round(change_rate_s * 1000))
+        # set change_s property at end of Tile init (avoid update() crash)
+        self.change_s = change_s
         # force update after 3s at dashboard startup (redis init time)
-        self.after(ms=3000, func=self.update)
+        self.after(ms=3_000, func=self.update)
+
+    @property
+    def change_s(self):
+        return self._change_s
+
+    @change_s.setter
+    def change_s(self, value):
+        self._change_s = value
+        self.init_cyclic_update(every_ms=round(value * 1_000))
 
     @property
     def raw_display(self):
@@ -1006,8 +1048,8 @@ class NewsBannerTile(Tile):
         # use a proportional font to handle spaces correctly, height is nb of lines
         tk.Label(self, textvariable=self._lbl_ban, height=1,
                  bg=self.cget('bg'), fg=Colors.NEWS_TXT, font=('courier', 51, 'bold')).pack(expand=True)
-        # auto-update clock
-        self.start_cyclic_update(update_ms=200)
+        # auto-update banner every 200ms
+        self.init_cyclic_update(every_ms=200)
 
     @property
     def l_titles(self):
@@ -1118,8 +1160,8 @@ class TwitterTile(Tile):
                  font=('courier', 14, 'bold', 'underline')).pack()
         tk.Label(self, textvariable=self._tw_text, bg=self.cget('bg'), fg=Colors.TXT,
                  wraplength=550, font=('courier', 14, 'bold')).pack(expand=True)
-        # auto-update carousel rotate
-        self.start_cyclic_update(update_ms=12000)
+        # auto-update tweet rotate every 12s
+        self.init_cyclic_update(every_ms=12_000)
 
     @property
     def l_tweet(self):

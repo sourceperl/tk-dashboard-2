@@ -51,8 +51,8 @@ class MainApp(tk.Tk):
         self.style.theme_settings('default', {'TNotebook.Tab': {'configure': {'padding': [17, 17]}}})
         # define notebook
         self.note = ttk.Notebook(self)
-        self.tab1 = LiveTilesTab(self.note, tiles_size=(17, 9), update_ms=5000)
-        self.tab2 = PdfTilesTab(self.note, tiles_size=(17, 9), update_ms=5000,
+        self.tab1 = LiveTilesTab(self.note, tiles_size=(17, 9))
+        self.tab2 = PdfTilesTab(self.note, tiles_size=(17, 9),
                                 list_tag=Tags.PDF_FILENAMES_L, raw_tag=Tags.PDF_CONTENT)
         self.note.add(self.tab1, text='Tableau de bord')
         self.note.add(self.tab2, text='Affichage réglementaire')
@@ -162,7 +162,7 @@ class LiveTilesTab(TilesTab):
         self.tl_crl = ImageRawCarouselTile(self, bg='white', raw_img_tag_d=Tags.DIR_CAROUSEL_RAW)
         self.tl_crl.set_tile(row=4, column=7, rowspan=4, columnspan=6)
         # start auto-update
-        self.start_cyclic_update()
+        self.init_cyclic_update(every_ms=5_000)
         # at startup:
         # trig update after 1s to let Tags io_thread populate values
         self.after(ms=1000, func=self.update)
