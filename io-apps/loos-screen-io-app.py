@@ -30,6 +30,16 @@ class IiyamaFrame:
         return self.raw[:-1]
 
     @property
+    def is_valid(self):
+        try:
+            csum = 0
+            for b in self.without_csum:
+                csum ^= b
+            return csum == self.raw[-1]
+        except IndexError:
+            return False
+
+    @property
     def header_id(self):
         return self.raw[0]
 
@@ -61,16 +71,6 @@ class IiyamaFrame:
     def data_body(self):
         data_body_len = self.length - 3
         return self.raw[7:7+data_body_len]
-
-    @property
-    def is_valid(self):
-        try:
-            csum = 0
-            for b in self.without_csum:
-                csum ^= b
-            return csum == self.raw[-1]
-        except IndexError:
-            return False
 
 
 class CustomSerial(Serial):
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     try:
         # init serial port
-        logging.debug('open serial port %s at %d,%s,%d,%d', args.device, args.baudrate, args.parity, 8, args.stop)
+        logging.info('open serial port %s at %d,%s,%d,%d', args.device, args.baudrate, args.parity, 8, args.stop)
         serial_port = CustomSerial(port=args.device, baudrate=args.baudrate, parity=args.parity, bytesize=8,
                                    stopbits=args.stop, timeout=args.timeout)
 
