@@ -173,51 +173,51 @@ class LiveTilesTab(TilesTab):
         # GRT
         self.tl_img_grt.raw_display = Tags.IMG_LOGO_GRT.get()
         # acc days stat
-        self.tl_acc.acc_date_dts = Tags.D_GSHEET_GRT.get(('tags', 'DATE_ACC_DTS'))
-        self.tl_acc.acc_date_digne = Tags.D_GSHEET_GRT.get(('tags', 'DATE_ACC_DIGNE'))
+        self.tl_acc.acc_date_dts = Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DTS'))
+        self.tl_acc.acc_date_digne = Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DIGNE'))
         # weather
         self.tl_weath.w_today_dict = Tags.D_W_TODAY_LOOS.get()
         self.tl_weath.w_forecast_dict = Tags.D_W_FORECAST_LOOS.get()
         # air Dunkerque
-        self.tl_atmo_dunk.qlt_index = Tags.D_ATMO_QUALITY.get('dunkerque')
+        self.tl_atmo_dunk.qlt_index = Tags.D_ATMO_QUALITY.get(path='dunkerque')
         # air Lille
-        self.tl_atmo_lil.qlt_index = Tags.D_ATMO_QUALITY.get('lille')
+        self.tl_atmo_lil.qlt_index = Tags.D_ATMO_QUALITY.get(path='lille')
         # air Maubeuge
-        self.tl_atmo_maub.qlt_index = Tags.D_ATMO_QUALITY.get('maubeuge')
+        self.tl_atmo_maub.qlt_index = Tags.D_ATMO_QUALITY.get(path='maubeuge')
         # air Saint-Quentin
-        self.tl_atmo_sque.qlt_index = Tags.D_ATMO_QUALITY.get('saint-quentin')
+        self.tl_atmo_sque.qlt_index = Tags.D_ATMO_QUALITY.get(path='saint-quentin')
         # update news widget
         self.tl_news.l_titles = Tags.D_NEWS_LOCAL.get()
         # gauges update
-        self.tl_g_veh.percent = Tags.D_GSHEET_GRT.get(('tags', 'IGP_VEH_JAUGE_DTS'))
-        self.tl_g_veh.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(('tags', 'IGP_VEH_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(('tags', 'IGP_VEH_OBJ_DTS')))
-        self.tl_g_loc.percent = Tags.D_GSHEET_GRT.get(('tags', 'IGP_LOC_JAUGE_DTS'))
-        self.tl_g_loc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(('tags', 'IGP_LOC_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(('tags', 'IGP_LOC_OBJ_DTS')))
-        self.tl_g_req.percent = Tags.D_GSHEET_GRT.get(('tags', 'R_EQU_JAUGE_DTS'))
-        self.tl_g_req.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(('tags', 'R_EQU_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(('tags', 'R_EQU_OBJ_DTS')))
-        self.tl_g_vcs.percent = Tags.D_GSHEET_GRT.get(('tags', 'VCS_JAUGE_DTS'))
-        self.tl_g_vcs.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(('tags', 'VCS_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(('tags', 'VCS_OBJ_DTS')))
-        self.tl_g_vst.percent = Tags.D_GSHEET_GRT.get(('tags', 'VST_JAUGE_DTS'))
-        self.tl_g_vst.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(('tags', 'VST_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(('tags', 'VST_OBJ_DTS')))
-        self.tl_g_qsc.percent = Tags.D_GSHEET_GRT.get(('tags', 'Q_HRE_JAUGE_DTS'))
-        self.tl_g_qsc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(('tags', 'Q_HRE_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(('tags', 'Q_HRE_OBJ_DTS')))
+        self.tl_g_veh.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_JAUGE_DTS'))
+        self.tl_g_veh.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_REAL_DTS')),
+                                              Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_OBJ_DTS')))
+        self.tl_g_loc.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_JAUGE_DTS'))
+        self.tl_g_loc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_REAL_DTS')),
+                                              Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_OBJ_DTS')))
+        self.tl_g_req.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_JAUGE_DTS'))
+        self.tl_g_req.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_REAL_DTS')),
+                                              Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_OBJ_DTS')))
+        self.tl_g_vcs.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_JAUGE_DTS'))
+        self.tl_g_vcs.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_REAL_DTS')),
+                                              Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_OBJ_DTS')))
+        self.tl_g_vst.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'VST_JAUGE_DTS'))
+        self.tl_g_vst.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'VST_REAL_DTS')),
+                                              Tags.D_GSHEET_GRT.get(path=('tags', 'VST_OBJ_DTS')))
+        self.tl_g_qsc.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_JAUGE_DTS'))
+        self.tl_g_qsc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_REAL_DTS')),
+                                              Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_OBJ_DTS')))
         # vigilance
-        self.tl_vig_59.vig_level = Tags.D_WEATHER_VIG.get(('department', '59', 'vig_level'))
-        self.tl_vig_59.risk_ids = Tags.D_WEATHER_VIG.get(('department', '59', 'risk_id'))
-        self.tl_vig_62.vig_level = Tags.D_WEATHER_VIG.get(('department', '62', 'vig_level'))
-        self.tl_vig_62.risk_ids = Tags.D_WEATHER_VIG.get(('department', '62', 'risk_id'))
-        self.tl_vig_80.vig_level = Tags.D_WEATHER_VIG.get(('department', '80', 'vig_level'))
-        self.tl_vig_80.risk_ids = Tags.D_WEATHER_VIG.get(('department', '80', 'risk_id'))
-        self.tl_vig_02.vig_level = Tags.D_WEATHER_VIG.get(('department', '02', 'vig_level'))
-        self.tl_vig_02.risk_ids = Tags.D_WEATHER_VIG.get(('department', '02', 'risk_id'))
-        self.tl_vig_60.vig_level = Tags.D_WEATHER_VIG.get(('department', '60', 'vig_level'))
-        self.tl_vig_60.risk_ids = Tags.D_WEATHER_VIG.get(('department', '60', 'risk_id'))
+        self.tl_vig_59.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level'))
+        self.tl_vig_59.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id'))
+        self.tl_vig_62.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level'))
+        self.tl_vig_62.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id'))
+        self.tl_vig_80.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '80', 'vig_level'))
+        self.tl_vig_80.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '80', 'risk_id'))
+        self.tl_vig_02.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '02', 'vig_level'))
+        self.tl_vig_02.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '02', 'risk_id'))
+        self.tl_vig_60.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '60', 'vig_level'))
+        self.tl_vig_60.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '60', 'risk_id'))
         # Watts news
         self.tl_watts.pwr = Tags.MET_PWR_ACT.get()
         self.tl_watts.today_wh = Tags.MET_TODAY_WH.get()

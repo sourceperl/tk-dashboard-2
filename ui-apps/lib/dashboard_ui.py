@@ -2,7 +2,6 @@
 
 from datetime import datetime, timedelta
 import copy
-import glob
 import functools
 import io
 import json
@@ -10,6 +9,7 @@ import math
 import os
 import subprocess
 import tempfile
+from typing import Callable, Union
 import locale
 import logging
 import threading
@@ -106,7 +106,7 @@ class CustomRedis(redis.Redis):
 
 
 class Tag:
-    def __init__(self, value=None, read=None, write=None, io_every=None):
+    def __init__(self, value=None, read: Callable = None, write: Callable = None, io_every: float = None) -> None:
         # private
         self._value = value
         self._read_cmd = read
@@ -115,7 +115,7 @@ class Tag:
         self._th_io_every = io_every
         self._th_last_run = 0.0
 
-    def io_update(self, ref=''):
+    def io_update(self, ref: str = '') -> None:
         # method call by Tags io thread
         if self._th_io_every:
             t_now = time.monotonic()
@@ -147,7 +147,7 @@ class Tag:
                     except Exception:
                         pass
 
-    def set(self, value):
+    def set(self, value: object) -> None:
         with self._lock:
             self._value = value
         # if tag don't use io_thread, call _write_cmd immediately
@@ -158,7 +158,7 @@ class Tag:
                 except Exception:
                     pass
 
-    def get(self, path=None, args=None):
+    def get(self, path: Union[str, list, tuple] = None, args: dict = None) -> object:
         # process func args
         if args is None:
             args = {}
@@ -759,24 +759,6 @@ class GaugeTile(Tile):
         self.can.coords(self.can_arrow, 112, 100, x, y)
 
 
-class ImageTile(Tile):
-    def __init__(self, *args, file='', img_ratio: int = 1, **kwargs):
-        Tile.__init__(self, *args, **kwargs)
-        # tk job
-        self.tk_img = tk.PhotoImage()
-        self.lbl_img = tk.Label(self, bg=self.cget('bg'))
-        self.lbl_img.pack(expand=True)
-        # display current image file
-        try:
-            # set file path
-            self.tk_img.configure(file=file)
-            # set image with resize ratio (if need)
-            self.tk_img = self.tk_img.subsample(img_ratio)
-            self.lbl_img.configure(image=self.tk_img)
-        except Exception:
-            logging.error(traceback.format_exc())
-
-
 class ImageRawTile(Tile):
     def __init__(self, *args, **kwargs):
         Tile.__init__(self, *args, **kwargs)
@@ -790,7 +772,7 @@ class ImageRawTile(Tile):
         return self.raw_display
 
     @raw_display.setter
-    def raw_display(self, value):
+    def raw_display(self, value: bytes):
         try:
             widget_size = (self.winfo_width(), self.winfo_height())
             # display current image file if raw_img is set
@@ -816,114 +798,14 @@ class ImageRawTile(Tile):
             logging.error(traceback.format_exc())
 
 
-class ImageRefreshTile(Tile):
-    def __init__(self, *args, file, img_ratio: int = 1, refresh_ms: int = 5_000, **kwargs):
-        Tile.__init__(self, *args, **kwargs)
-        # public
-        self.file = file
-        self.img_ratio = img_ratio
-        # private
-        self._refresh_ms = None
-        # tk job
-        self.tk_img = tk.PhotoImage()
-        self.lbl_img = tk.Label(self, bg=self.cget('bg'))
-        self.lbl_img.pack(expand=True)
-        # set refresh property at end of Tile init (avoid update() crash)
-        self.refresh_ms = refresh_ms
-
-    @property
-    def refresh_ms(self):
-        return self._refresh_ms
-
-    @refresh_ms.setter
-    def refresh_ms(self, value):
-        self._refresh_ms = value
-        self.init_cyclic_update(every_ms=self._refresh_ms)
-
-    def update(self):
-        # display current image file
-        try:
-            # set file path
-            self.tk_img.configure(file=self.file)
-            # set image with resize ratio (if need)
-            self.tk_img = self.tk_img.subsample(self.img_ratio)
-            self.lbl_img.configure(image=self.tk_img)
-        except Exception:
-            logging.error(traceback.format_exc())
-
-
-class ImageCarouselTile(Tile):
-    def __init__(self, *args, img_path: str, refresh_ms: int = 20_000, **kwargs):
-        Tile.__init__(self, *args, **kwargs)
-        # public
-        self.img_path = img_path
-        # private
-        self._img_index = 0
-        self._img_files = list()
-        self._skip_update_cnt = 0
-        self._refresh_ms = None
-        # tk job
-        self.configure(bg='white')
-        self.tk_img = tk.PhotoImage()
-        self.lbl_img = tk.Label(self, image=self.tk_img)
-        self.lbl_img.pack(expand=True)
-        # first img load
-        self._img_files_load()
-        # bind function for skip update
-        self.bind('<Button-1>', self._on_click)
-        self.lbl_img.bind('<Button-1>', self._on_click)
-        # set refresh property at end of Tile init (avoid update() crash)
-        self.refresh_ms = refresh_ms
-
-    @property
-    def refresh_ms(self):
-        return self._refresh_ms
-
-    @refresh_ms.setter
-    def refresh_ms(self, value):
-        self._refresh_ms = value
-        self.init_cyclic_update(every_ms=self._refresh_ms)
-
-    def update(self):
-        # display next image or skip this if skip counter is set
-        if self._skip_update_cnt <= 0:
-            self._load_next_img()
-        else:
-            self._skip_update_cnt -= 1
-
-    def _on_click(self, _evt):
-        # on first click: skip the 8 next auto update cycle
-        # on second one: also load the next image
-        if self._skip_update_cnt > 0:
-            self._load_next_img()
-        self._skip_update_cnt = 8
-
-    def _load_next_img(self):
-        # next img file index
-        self._img_index += 1
-        if self._img_index >= len(self._img_files):
-            self._img_index = 0
-            self._img_files_load()
-        # display current image file
-        try:
-            self.tk_img.configure(file=self._img_files[self._img_index])
-        except Exception:
-            logging.error(traceback.format_exc())
-
-    def _img_files_load(self):
-        self._img_files = glob.glob(os.path.join(self.img_path, '*.png'))
-        self._img_files.sort()
-
-
 class ImageRawCarouselTile(Tile):
-    def __init__(self, *args, raw_img_tag_d: Tag, change_s: float = 20.0, **kwargs):
+    def __init__(self, *args, raw_img_tag_d: Tag, update_ms: int = 20_000, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         # public
         self.raw_img_tag_d = raw_img_tag_d
         # private
-        self._playlist = list()
-        self._skip_update_cnt = 0
-        self._change_s = None
+        self._playlist = []
+        self._skip_n_cycle = 0
         # tk widget init
         # don't remove tk_img: keep a ref to avoid del by garbage collect
         self.tk_img = tk.PhotoImage()
@@ -932,19 +814,11 @@ class ImageRawCarouselTile(Tile):
         # bind function for skip update
         self.bind('<Button-1>', self._on_click)
         self.lbl_img.bind('<Button-1>', self._on_click)
-        # set change_s property at end of Tile init (avoid update() crash)
-        self.change_s = change_s
         # force update after 3s at dashboard startup (redis init time)
         self.after(ms=3_000, func=self.update)
-
-    @property
-    def change_s(self):
-        return self._change_s
-
-    @change_s.setter
-    def change_s(self, value):
-        self._change_s = value
-        self.init_cyclic_update(every_ms=round(value * 1_000))
+        # init image change_s rate
+        if update_ms:
+            self.init_cyclic_update(every_ms=update_ms)
 
     @property
     def raw_display(self):
@@ -978,45 +852,36 @@ class ImageRawCarouselTile(Tile):
 
     def update(self):
         # display next image or skip this if skip counter is set
-        if self._skip_update_cnt <= 0:
-            self._load_next_img()
+        if self._skip_n_cycle > 0:
+            self._skip_n_cycle -= 1
         else:
-            self._skip_update_cnt -= 1
+            self._load_next_img()
 
     def _load_next_img(self):
-        try:
-            # try to load next valid image
-            while True:
-                next_img_name = self._playlist.pop(0)
-                raw_value = self.raw_img_tag_d.get(next_img_name)
-                # load valid raw img or try next one
-                if raw_value:
-                    # load display and exit loop
-                    self.raw_display = raw_value
+        # try to load next valid image
+        while True:
+            try:
+                img_name = self._playlist.pop(0)
+                self.raw_display = self.raw_img_tag_d.get(img_name)
+                break
+            except IndexError:
+                # refill playlist
+                try:
+                    self._playlist = list(dict(self.raw_img_tag_d.get()).keys())
+                    self._playlist.sort()
+                    # test empty list
+                    if not self._playlist:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    self.raw_display = None
                     break
-        except IndexError:
-            # refill playlist if empty
-            self._fill_playlist()
-
-    def _fill_playlist(self):
-        # fill playlist with image filename to display
-        try:
-            img_raw_d = self.raw_img_tag_d.get()
-            if not img_raw_d:
-                raise ValueError
-            self._playlist = list(img_raw_d.keys())
-            self._playlist.sort()
-        except ValueError:
-            # clear playlist and force "n/a" on Tile display
-            self.raw_display = None
-            self._playlist.clear()
 
     def _on_click(self, _evt):
         # on first click: skip the 8 next auto update cycle
         # on second one: also load the next image
-        if self._skip_update_cnt > 0:
+        if self._skip_n_cycle > 0:
             self._load_next_img()
-        self._skip_update_cnt = 8
+        self._skip_n_cycle = 8
 
 
 class MessageTile(Tile):
