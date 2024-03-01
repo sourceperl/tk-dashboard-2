@@ -369,6 +369,11 @@ class Tile(tk.Frame):
         self.pack_propagate(False)
         self.grid_propagate(False)
 
+    def add_on_click_cmd(self, cmd: Callable):
+        self.bind('<Button-1>', lambda evt: cmd(), add='+')
+        for widget in self.winfo_children():
+            widget.bind('<Button-1>', lambda evt: cmd(), add='+')
+
     def set_tile(self, row=0, column=0, rowspan=1, columnspan=1):
         # function to print a tile on the screen at the given coordonates
         self.grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan, sticky=tk.NSEW)

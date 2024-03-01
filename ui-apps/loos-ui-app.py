@@ -61,7 +61,7 @@ class MainApp(tk.Tk):
         # default tab
         self.note.select(self.tab1)
         # press Esc to quit
-        self.bind('<Escape>', lambda e: self.destroy())
+        self.bind('<Escape>', lambda evt: self.destroy())
         # bind function keys to tabs
         self.bind('<F1>', lambda evt: self.note.select(self.tab1))
         self.bind('<F2>', lambda evt: self.note.select(self.tab2))
@@ -117,6 +117,7 @@ class LiveTilesTab(TilesTab):
         # empty area(s)
         self.tl_empty = EmptyTile(self)
         self.tl_empty.set_tile(row=2, column=5, rowspan=2, columnspan=8)
+        self.tl_empty.add_on_click_cmd(self._on_click_empty_tile)
         # news banner
         self.tl_news = NewsBannerTile(self)
         self.tl_news.set_tile(row=8, column=0, columnspan=17)
@@ -153,7 +154,7 @@ class LiveTilesTab(TilesTab):
         # acc days stat
         self.tl_acc = DaysAccTileLoos(self)
         self.tl_acc.set_tile(row=0, column=8, columnspan=5, rowspan=2)
-        # grt img
+        # grt logo img
         self.tl_img_grt = ImageRawTile(self, bg='white')
         self.tl_img_grt.set_tile(row=6, column=13, rowspan=2, columnspan=4)
         # carousel
@@ -224,6 +225,9 @@ class LiveTilesTab(TilesTab):
         self.tl_watts.yesterday_wh = Tags.MET_YESTERDAY_WH.get()
         # flyspray
         self.tl_fly.l_items = Tags.L_FLYSPRAY_RSS.get()
+
+    def _on_click_empty_tile(self):
+        pass
 
 
 # main
