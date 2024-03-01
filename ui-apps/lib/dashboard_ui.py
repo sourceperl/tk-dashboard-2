@@ -9,9 +9,10 @@ import math
 import os
 import subprocess
 import tempfile
-from typing import Callable, Union
+from typing import Any, Callable, Union
 import locale
 import logging
+import queue
 import threading
 import time
 import traceback
@@ -89,12 +90,46 @@ def wait_uptime(min_s: float):
 
 
 # some class
+class AsyncTask:
+    """ A class to implement items async processing (run in a separate thread). """
+
+    def __init__(self, max_items: int = 20) -> None:
+        # init an items queue
+        self._queue = queue.Queue(maxsize=max_items)
+        # start a thread to manage items in queue
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        while True:
+            try:
+                item = self._queue.get()
+                self.process(item)
+            except Exception as e:
+                logging.warning(f'except {type(e).__name__} in {type(self).__name__}: {e}')
+            finally:
+                self._queue.task_done()
+
+    def process(self, item: Any) -> None:
+        raise NotImplemented
+
+    def send(self, item: Any) -> None:
+        try:
+            self._queue.put_nowait(item)
+        except queue.Full:
+            pass
+
+
 class CustomRedis(redis.Redis):
     LOG_LEVEL = logging.DEBUG
 
     @catch_log_except(catch=redis.RedisError, log_lvl=LOG_LEVEL)
     def execute_command(self, *args, **options):
         return super().execute_command(*args, **options)
+    
+    @catch_log_except(catch=redis.RedisError, log_lvl=LOG_LEVEL)
+    def publish(self, channel: str | bytes, message: str | bytes, **kwargs: Any) -> int:
+        return super().publish(channel, message, **kwargs)
 
     @catch_log_except(catch=(redis.RedisError, AttributeError, json.decoder.JSONDecodeError), log_lvl=LOG_LEVEL)
     def set_js(self, name, obj, ex=None, px=None, nx=False, xx=False, keepttl=False):

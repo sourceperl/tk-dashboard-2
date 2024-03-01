@@ -2,10 +2,11 @@
 
 import argparse
 import logging
+from typing import Any
 import tkinter as tk
 from tkinter import ttk
 from lib.dashboard_ui import \
-    CustomRedis, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
+    AsyncTask, CustomRedis, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
     AirQualityTile, ClockTile, DaysAccTileLoos, EmptyTile, GaugeTile, NewsBannerTile, \
     FlysprayTile, ImageRawTile, ImageRawCarouselTile, VigilanceTile, WattsTile, WeatherTile
 from conf.private_loos import REDIS_USER, REDIS_PASS
@@ -38,6 +39,15 @@ class Tags(TagsBase):
     DIR_CAROUSEL_RAW = Tag(read=lambda: DB.main.hgetall('dir:carousel:raw:min-png'), io_every=10.0)
     PDF_FILENAMES_L = Tag(read=lambda: map(bytes.decode, DB.main.hkeys('dir:doc:raw')))
     PDF_CONTENT = Tag(read=lambda file: DB.main.hget('dir:doc:raw', file))
+
+
+class RedisFooPubTask(AsyncTask):
+    def process(self, item: Any):
+        DB.main.publish(channel='foo', message=str(item))
+
+
+class AsyncTasks:
+    redis_foo_pub = RedisFooPubTask(max_items=3)
 
 
 class MainApp(tk.Tk):
@@ -227,7 +237,7 @@ class LiveTilesTab(TilesTab):
         self.tl_fly.l_items = Tags.L_FLYSPRAY_RSS.get()
 
     def _on_click_empty_tile(self):
-        pass
+        AsyncTasks.redis_foo_pub.send('click on empty tile')
 
 
 # main
