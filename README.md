@@ -19,12 +19,6 @@ sudo ufw allow proto tcp from 192.168.0.0/24 to any port ssh
 sudo ufw enable
 ```
 
-### Redis
-
-```bash
-# ...
-```
-
 ### Global
 
 ```bash
@@ -77,3 +71,30 @@ echo 'start with cp example_private_data.py private_data.py'
 sudo cp supervisor/tk-dashboard-loos.conf /etc/supervisor/conf.d/
 sudo supervisorctl update
 ```
+
+### Stunnel
+
+```bash
+# ...
+```
+
+### Redis
+
+```bash
+# ...
+```
+
+### HOWTOs
+
+#### SSL/TLS
+
+```bash
+# create private key and self-signed certificate for server
+target_prefix=loos-redis-cli
+sudo openssl req -x509 -newkey rsa:4096 -days 3650 -nodes \
+                 -subj "/C=FR/ST=Haut-de-France/L=Loos/CN=dashboard-loos-master-srv" \
+                 -keyout ${target_prefix}.key \
+                 -out ${target_prefix}.crt
+```
+
+
