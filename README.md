@@ -8,7 +8,7 @@
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y redis supervisor stunnel4 fail2ban ufw xpdf fonts-freefont-ttf python3-redis
+sudo apt install -y redis supervisor stunnel4 fail2ban ufw xpdf fonts-freefont-ttf fonts-noto-core python3-redis
 ```
 
 ### Firewall 

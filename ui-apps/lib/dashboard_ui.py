@@ -1118,7 +1118,7 @@ class VigilanceTile(Tile):
         self.configure(bg=Colors.NA)
         tk.Label(self, text='Vigilance', font='bold', bg=Colors.NA, fg=Colors.TXT).pack()
         tk.Label(self, text=self.department, font='bold', bg=Colors.NA, fg=Colors.TXT).pack()
-        tk.Label(self, font=('', 6), bg=Colors.NA, fg=Colors.TXT).pack()
+        tk.Label(self, font=('', 2), bg=Colors.NA, fg=Colors.TXT).pack()
         tk.Label(self, textvariable=self._level_str, font='bold', bg=Colors.NA, fg=Colors.TXT).pack()
         tk.Label(self, textvariable=self._risk_str, font=('', 8), bg=Colors.NA, fg=Colors.TXT).pack()
 

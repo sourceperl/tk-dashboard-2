@@ -133,15 +133,15 @@ class LiveTilesTab(TilesTab):
         # outdoor ble data
         temp_c = Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'temp_c'))
         temp_c_str = f'{temp_c:>6.1f}' if temp_c is not None else 'n/a'
-        hum_p = Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_c'))
+        hum_p = Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_p'))
         hum_p_str = f'{hum_p:>6.1f}' if hum_p is not None else 'n/a'
-        self.tl_ext.str_var.set(f'Ext\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
+        self.tl_ext.str_var.set(f'Extérieur\n\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
         # kitchen ble data
         temp_c = Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'temp_c'))
         temp_c_str = f'{temp_c:>6.1f}' if temp_c is not None else 'n/a'
-        hum_p = Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_c'))
+        hum_p = Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_p'))
         hum_p_str = f'{hum_p:>6.1f}' if hum_p is not None else 'n/a'
-        self.tl_kit.str_var.set(f'Cuisine\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
+        self.tl_kit.str_var.set(f'Cuisine\n\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
 
 
 # main
