@@ -6,7 +6,7 @@ from typing import Any
 import tkinter as tk
 from tkinter import ttk
 from lib.dashboard_ui import \
-    CustomRedis, Tag, TagsBase, TilesTab, wait_uptime, \
+    Colors, CustomRedis, Tag, TagsBase, Tile, TilesTab, wait_uptime, \
     AirQualityTile, ClockTile, EmptyTile,  ImageRawTile, VigilanceTile
 from conf.private_wam import REDIS_USER, REDIS_PASS
 
@@ -24,8 +24,18 @@ class Tags(TagsBase):
     #        -> tags callbacks (read/write methods) are call by this IO thread (not by tkinter main thread)
     D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
+    BLE_SENSOR_DATA = Tag(read=lambda: DB.main.get_js('json:ble-data'), io_every=2.0)
     IMG_ATMO_HDF = Tag(read=lambda: DB.main.get('img:static:logo-atmo-hdf:png'), io_every=10.0)
+    IMG_MF = Tag(read=lambda: DB.main.get('img:static:logo-mf:png'), io_every=10.0)
     IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
+
+
+class CustomLabelTile(Tile):
+    def __init__(self, *args, **kwargs):
+        Tile.__init__(self, *args, **kwargs)
+        self.str_var = tk.StringVar()
+        tk.Label(self, textvariable=self.str_var, font=('bold', 14), bg=self.cget('bg'),
+                 anchor=tk.W, justify=tk.LEFT, fg=Colors.TXT).pack(expand=True)
 
 
 class MainApp(tk.Tk):
@@ -80,6 +90,9 @@ class LiveTilesTab(TilesTab):
         # air quality Lille
         self.tl_atmo_lil = AirQualityTile(self, city='Lille')
         self.tl_atmo_lil.set_tile(row=0, column=1)
+        # logo MF
+        self.tl_img_mf = ImageRawTile(self, bg='#005892')
+        self.tl_img_mf.set_tile(row=0, column=2)
         # weather vigilance
         self.tl_vig_59 = VigilanceTile(self, department='59')
         self.tl_vig_59.set_tile(row=0, column=3)
@@ -91,6 +104,12 @@ class LiveTilesTab(TilesTab):
         # clock
         self.tl_clock = ClockTile(self)
         self.tl_clock.set_tile(row=0, column=5, rowspan=2, columnspan=3)
+        # ext weather
+        self.tl_ext = CustomLabelTile(self)
+        self.tl_ext.set_tile(row=2, column=5, rowspan=1, columnspan=1)
+        # kitchen weather
+        self.tl_kit = CustomLabelTile(self)
+        self.tl_kit.set_tile(row=2, column=6, rowspan=1, columnspan=1)
         # start auto-update
         self.init_cyclic_update(every_ms=5_000)
         # at startup:
@@ -98,17 +117,31 @@ class LiveTilesTab(TilesTab):
         self.after(ms=2_000, func=self.update)
 
     def update(self):
-        # traffic map
-        self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
         # atmo
         self.tl_img_atmo.raw_display = Tags.IMG_ATMO_HDF.get()
         # air Lille
         self.tl_atmo_lil.qlt_index = Tags.D_ATMO_QUALITY.get(path='lille')
+        # mf
+        self.tl_img_mf.raw_display = Tags.IMG_MF.get()
         # vigilance
         self.tl_vig_59.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level'))
         self.tl_vig_59.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id'))
         self.tl_vig_62.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level'))
         self.tl_vig_62.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id'))
+        # traffic map
+        self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
+        # outdoor ble data
+        temp_c = Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'temp_c'))
+        temp_c_str = f'{temp_c:>6.1f}' if temp_c is not None else 'n/a'
+        hum_p = Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_c'))
+        hum_p_str = f'{hum_p:>6.1f}' if hum_p is not None else 'n/a'
+        self.tl_ext.str_var.set(f'Ext\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
+        # kitchen ble data
+        temp_c = Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'temp_c'))
+        temp_c_str = f'{temp_c:>6.1f}' if temp_c is not None else 'n/a'
+        hum_p = Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_c'))
+        hum_p_str = f'{hum_p:>6.1f}' if hum_p is not None else 'n/a'
+        self.tl_kit.str_var.set(f'Cuisine\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
 
 
 # main

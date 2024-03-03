@@ -13,7 +13,8 @@ from metar.Metar import Metar
 import PIL.Image
 import PIL.ImageDraw
 from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local, wait_uptime
-from conf.private_wam import REDIS_USER, REDIS_PASS, GMAP_IMG_URL, VIGILANCE_KEY
+from conf.private_wam import REDIS_HALL_USER, REDIS_PASS, REDIS_HALL_PORT, REDIS_HALL_USER, REDIS_HALL_PASS, \
+    GMAP_IMG_URL, VIGILANCE_KEY
 
 
 # some const
@@ -26,8 +27,9 @@ owc_car_dir_last_sync = 0
 
 # some class
 class DB:
-    # create connector
-    main = CustomRedis(host='localhost', username=REDIS_USER, password=REDIS_PASS,
+    main = CustomRedis(host='localhost', username=REDIS_HALL_USER, password=REDIS_PASS,
+                       socket_timeout=4, socket_keepalive=True)
+    hall = CustomRedis(host='localhost', port=REDIS_HALL_PORT, username=REDIS_HALL_USER, password=REDIS_PASS,
                        socket_timeout=4, socket_keepalive=True)
 
 
@@ -69,6 +71,21 @@ def air_quality_atmo_hdf_job():
                      'valenciennes': zones_d.get('59606', 0)}
     # update redis
     DB.main.set_as_json('json:atmo', d_air_quality, ex=6*3600)
+
+
+@catch_log_except()
+def ble_sensor_job():
+    ble_data_d = {}
+    # add outdoor ble data
+    ble_out_d = DB.hall.get_from_json('ble-data-js:outdoor')
+    if ble_out_d:
+        ble_data_d['outdoor'] = {'temp_c': ble_out_d.get('temp_c'), 'hum_p': ble_out_d.get('hum_p')}
+    # add kitchen ble data
+    ble_kit_d = DB.hall.get_from_json('ble-data-js:kitchen')
+    if ble_kit_d:
+        ble_data_d['kitchen'] = {'temp_c': ble_kit_d.get('temp_c'), 'hum_p': ble_kit_d.get('hum_p')}
+    # publish
+    DB.main.set_as_json('json:ble-data', ble_data_d, ex=3600)
 
 
 @catch_log_except()
@@ -148,6 +165,7 @@ if __name__ == '__main__':
 
     # init scheduler
     schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
+    schedule.every(1).minute.do(ble_sensor_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
     schedule.every(5).minutes.do(vigilance_job)
 
@@ -155,6 +173,7 @@ if __name__ == '__main__':
     wait_uptime(min_s=25.0)
 
     # first call
+    ble_sensor_job()
     air_quality_atmo_hdf_job()
     img_gmap_traffic_job()
     vigilance_job()
