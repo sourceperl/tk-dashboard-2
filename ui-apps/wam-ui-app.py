@@ -6,7 +6,7 @@ from typing import Any
 import tkinter as tk
 from tkinter import ttk
 from lib.dashboard_ui import \
-    Colors, CustomRedis, Tag, TagsBase, Tile, TilesTab, wait_uptime, \
+    Colors, CustomRedis, Tag, TagsBase, Tile, TilesTab, fmt_value, wait_uptime, \
     AirQualityTile, ClockTile, EmptyTile,  ImageRawTile, VigilanceTile
 from conf.private_wam import REDIS_USER, REDIS_PASS
 
@@ -25,6 +25,7 @@ class Tags(TagsBase):
     D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
     BLE_SENSOR_DATA = Tag(read=lambda: DB.main.get_js('json:ble-data'), io_every=2.0)
+    METAR_DATA = Tag(read=lambda: DB.main.get_js('json:metar:lesquin'), io_every=2.0)
     IMG_ATMO_HDF = Tag(read=lambda: DB.main.get('img:static:logo-atmo-hdf:png'), io_every=10.0)
     IMG_MF = Tag(read=lambda: DB.main.get('img:static:logo-mf:png'), io_every=10.0)
     IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
@@ -34,8 +35,8 @@ class CustomLabelTile(Tile):
     def __init__(self, *args, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         self.str_var = tk.StringVar()
-        tk.Label(self, textvariable=self.str_var, font=('bold', 14), bg=self.cget('bg'),
-                 anchor=tk.W, justify=tk.LEFT, fg=Colors.TXT).pack(expand=True)
+        tk.Label(self, textvariable=self.str_var, font=('bold', 12), bg=self.cget('bg'),
+                 anchor=tk.W, justify=tk.LEFT, fg=Colors.TXT).place(relx=0, rely=0)
 
 
 class MainApp(tk.Tk):
@@ -109,7 +110,10 @@ class LiveTilesTab(TilesTab):
         self.tl_ext.set_tile(row=2, column=5, rowspan=1, columnspan=1)
         # kitchen weather
         self.tl_kit = CustomLabelTile(self)
-        self.tl_kit.set_tile(row=2, column=6, rowspan=1, columnspan=1)
+        self.tl_kit.set_tile(row=2, column=7, rowspan=1, columnspan=1)
+        # kitchen weather
+        self.tl_metar = CustomLabelTile(self)
+        self.tl_metar.set_tile(row=3, column=5, rowspan=1, columnspan=3)
         # start auto-update
         self.init_cyclic_update(every_ms=5_000)
         # at startup:
@@ -131,17 +135,29 @@ class LiveTilesTab(TilesTab):
         # traffic map
         self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
         # outdoor ble data
-        temp_c = Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'temp_c'))
-        temp_c_str = f'{temp_c:>6.1f}' if temp_c is not None else 'n/a'
-        hum_p = Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_p'))
-        hum_p_str = f'{hum_p:>6.1f}' if hum_p is not None else 'n/a'
-        self.tl_ext.str_var.set(f'Extérieur\n\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
+        temp_c = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'temp_c')), fmt='>6.1f')
+        hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_p')), fmt='>6.1f')
+        self.tl_ext.str_var.set(f'Extérieur\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
         # kitchen ble data
-        temp_c = Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'temp_c'))
-        temp_c_str = f'{temp_c:>6.1f}' if temp_c is not None else 'n/a'
-        hum_p = Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_p'))
-        hum_p_str = f'{hum_p:>6.1f}' if hum_p is not None else 'n/a'
-        self.tl_kit.str_var.set(f'Cuisine\n\n\N{THERMOMETER} {temp_c_str} °C\n\N{BLACK DROPLET} {hum_p_str} %')
+        temp_c = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'temp_c')), fmt='>6.1f')
+        hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_p')), fmt='>6.1f')
+        self.tl_kit.str_var.set(f'Cuisine\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
+        # metar data
+        update_fr = fmt_value(Tags.METAR_DATA.get(path='update_fr'), fmt='', alt_str='#'*5)
+        press_hpa = fmt_value(Tags.METAR_DATA.get(path='press'), fmt='>5.0f', alt_str='#'*5)
+        temp_c = fmt_value(Tags.METAR_DATA.get(path='temp'), fmt='>8.1f', alt_str='#'*8)
+        dewpt_c = fmt_value(Tags.METAR_DATA.get(path='dewpt'), fmt='>6.1f', alt_str='#'*6)
+        w_speed_kmh = fmt_value(Tags.METAR_DATA.get(path='w_speed'), fmt='>3.0f', alt_str='#'*6)
+        w_dir = fmt_value(Tags.METAR_DATA.get(path='w_dir'), fmt='', alt_str='#')
+        w_gust_kmh = fmt_value(Tags.METAR_DATA.get(path='w_gust'), fmt='>3.0f', alt_str='')
+        w_gust_kmh_str = f'(\N{LEAF FLUTTERING IN WIND} {w_gust_kmh} km/h)' if w_gust_kmh else ''
+        self.tl_metar.str_var.set(f'Lesquin (station Météo-France)\n'
+                                  f'{update_fr}\t\N{TIMER CLOCK} {press_hpa} hPa\n'
+                                  f'\N{THERMOMETER} {temp_c} °C'
+                                  f'\t\N{WIND BLOWING FACE} {w_speed_kmh} km/h\n'
+                                  f'\N{THERMOMETER}\N{BLACK DROPLET} {dewpt_c} °C  '
+                                  f'\t\N{WHITE-FEATHERED RIGHTWARDS ARROW}   {w_dir}'
+                                  f' {w_gust_kmh_str}')
 
 
 # main

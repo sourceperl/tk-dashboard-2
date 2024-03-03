@@ -156,6 +156,47 @@ def vigilance_job():
     DB.main.set_as_json('json:vigilance', vig_d, ex=2*3600)
 
 
+@catch_log_except()
+def metar_lesquin_job():
+    # request data from NOAA server (METAR of Lille-Lesquin Airport)
+    request = Request(url='http://tgftp.nws.noaa.gov/data/observations/metar/stations/LFQQ.TXT',
+                      headers={'User-Agent': USER_AGENT})
+    uo_ret = urlopen(request, timeout=10.0)
+    # extract METAR message
+    metar_msg = uo_ret.read().decode().split('\n')[1]
+    # METAR parse
+    obs = Metar(metar_msg)
+    # init and populate d_today dict
+    d_today = {}
+    # message date and time
+    if obs.time:
+        d_today['update_iso'] = obs.time.strftime('%Y-%m-%dT%H:%M:%SZ')
+        d_today['update_fr'] = dt_utc_to_local(obs.time).strftime('%H:%M %d/%m')
+    # current temperature
+    if obs.temp:
+        d_today['temp'] = round(obs.temp.value('C'))
+    # current dew point
+    if obs.dewpt:
+        d_today['dewpt'] = round(obs.dewpt.value('C'))
+    # current pressure
+    if obs.press:
+        d_today['press'] = round(obs.press.value('hpa'))
+    # current wind speed
+    if obs.wind_speed:
+        d_today['w_speed'] = round(obs.wind_speed.value('KMH'))
+    # current wind gust
+    if obs.wind_gust:
+        d_today['w_gust'] = round(obs.wind_gust.value('KMH'))
+    # current wind direction
+    if obs.wind_dir:
+        # replace 'W'est by 'O'uest
+        d_today['w_dir'] = obs.wind_dir.compass().replace('W', 'O')
+    # weather status str
+    d_today['descr'] = 'n/a'
+    # store to redis
+    DB.main.set_as_json('json:metar:lesquin', d_today, ex=2*3600)
+
+
 # main
 if __name__ == '__main__':
     # logging setup
@@ -167,8 +208,9 @@ if __name__ == '__main__':
     schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
     schedule.every(1).minute.do(ble_sensor_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
+    schedule.every(5).minutes.do(metar_lesquin_job)
     schedule.every(5).minutes.do(vigilance_job)
-
+    
     # wait system ready (uptime > 25s)
     wait_uptime(min_s=25.0)
 
@@ -176,6 +218,7 @@ if __name__ == '__main__':
     ble_sensor_job()
     air_quality_atmo_hdf_job()
     img_gmap_traffic_job()
+    metar_lesquin_job()
     vigilance_job()
 
     # main loop

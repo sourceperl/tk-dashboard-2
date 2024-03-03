@@ -89,6 +89,10 @@ def wait_uptime(min_s: float):
         time.sleep(0.1)
 
 
+def fmt_value(value: Any, fmt: str = '', alt_str: str = 'n/a') -> str:
+    return alt_str if value is None else f'{value:{fmt}}'
+
+
 # some class
 class AsyncTask:
     """ A class to implement items async processing (run in a separate thread). """
@@ -126,7 +130,7 @@ class CustomRedis(redis.Redis):
     @catch_log_except(catch=redis.RedisError, log_lvl=LOG_LEVEL)
     def execute_command(self, *args, **options):
         return super().execute_command(*args, **options)
-    
+
     @catch_log_except(catch=redis.RedisError, log_lvl=LOG_LEVEL)
     def publish(self, channel: str | bytes, message: str | bytes, **kwargs: Any) -> int:
         return super().publish(channel, message, **kwargs)
