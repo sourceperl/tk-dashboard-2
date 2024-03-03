@@ -143,12 +143,12 @@ class LiveTilesTab(TilesTab):
         hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_p')), fmt='>6.1f')
         self.tl_kit.str_var.set(f'Cuisine\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
         # metar data
-        update_fr = fmt_value(Tags.METAR_DATA.get(path='update_fr'), fmt='', alt_str='#'*5)
-        press_hpa = fmt_value(Tags.METAR_DATA.get(path='press'), fmt='>5.0f', alt_str='#'*5)
-        temp_c = fmt_value(Tags.METAR_DATA.get(path='temp'), fmt='>8.1f', alt_str='#'*8)
-        dewpt_c = fmt_value(Tags.METAR_DATA.get(path='dewpt'), fmt='>6.1f', alt_str='#'*6)
-        w_speed_kmh = fmt_value(Tags.METAR_DATA.get(path='w_speed'), fmt='>3.0f', alt_str='#'*6)
-        w_dir = fmt_value(Tags.METAR_DATA.get(path='w_dir'), fmt='', alt_str='#')
+        update_fr = fmt_value(Tags.METAR_DATA.get(path='update_fr'), fmt='', alt_str='\t')
+        press_hpa = fmt_value(Tags.METAR_DATA.get(path='press'), fmt='>5.0f')
+        temp_c = fmt_value(Tags.METAR_DATA.get(path='temp'), fmt='>8.1f', alt_str='   n/a')
+        dewpt_c = fmt_value(Tags.METAR_DATA.get(path='dewpt'), fmt='>6.1f')
+        w_speed_kmh = fmt_value(Tags.METAR_DATA.get(path='w_speed'), fmt='>3.0f')
+        w_dir = fmt_value(Tags.METAR_DATA.get(path='w_dir'), fmt='')
         w_gust_kmh = fmt_value(Tags.METAR_DATA.get(path='w_gust'), fmt='>3.0f', alt_str='')
         w_gust_kmh_str = f'(\N{LEAF FLUTTERING IN WIND} {w_gust_kmh} km/h)' if w_gust_kmh else ''
         self.tl_metar.str_var.set(f'Lesquin (station Météo-France)\n'
