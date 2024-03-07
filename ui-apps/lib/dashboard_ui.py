@@ -9,7 +9,7 @@ import math
 import os
 import subprocess
 import tempfile
-from typing import Any, Callable, Union
+from typing import Any, Callable, List, Union
 import locale
 import logging
 import queue
@@ -459,11 +459,11 @@ class AirQualityTile(Tile):
         tk.Label(self, textvariable=self._status_str, fg=Colors.TXT).pack()
 
     @property
-    def qlt_index(self):
+    def level(self):
         return self._qlt_index
 
-    @qlt_index.setter
-    def qlt_index(self, value):
+    @level.setter
+    def level(self, value):
         # check type
         try:
             value = int(value)
@@ -552,11 +552,11 @@ class DaysAccTileLoos(Tile):
         self.init_cyclic_update(every_ms=5_000)
 
     @property
-    def acc_date_dts(self):
+    def acc_date_dts(self) -> str:
         return self._acc_date_dts
 
     @acc_date_dts.setter
-    def acc_date_dts(self, value):
+    def acc_date_dts(self, value: str):
         # check type
         try:
             value = str(value)
@@ -570,11 +570,11 @@ class DaysAccTileLoos(Tile):
             self.update()
 
     @property
-    def acc_date_digne(self):
+    def acc_date_digne(self) -> str:
         return self._acc_date_digne
 
     @acc_date_digne.setter
-    def acc_date_digne(self, value):
+    def acc_date_digne(self, value: str):
         # check type
         try:
             value = str(value)
@@ -592,7 +592,7 @@ class DaysAccTileLoos(Tile):
         self._days_digne_str.set(self.day_from_now(self._acc_date_digne))
 
     @staticmethod
-    def day_from_now(date_str):
+    def day_from_now(date_str: str) -> str:
         try:
             day, month, year = map(int, str(date_str).split('/'))
             return str((datetime.now() - datetime(year, month, day)).days)
@@ -628,11 +628,11 @@ class DaysAccTileMessein(Tile):
         self.init_cyclic_update(every_ms=5_000)
 
     @property
-    def acc_date_dts(self):
+    def acc_date_dts(self) -> str:
         return self._acc_date_dts
 
     @acc_date_dts.setter
-    def acc_date_dts(self, value):
+    def acc_date_dts(self, value: str):
         # check type
         try:
             value = str(value)
@@ -649,7 +649,7 @@ class DaysAccTileMessein(Tile):
         self._days_dts_str.set(self.day_from_now(self._acc_date_dts))
 
     @staticmethod
-    def day_from_now(date_str):
+    def day_from_now(date_str: str) -> str:
         try:
             day, month, year = map(int, str(date_str).split('/'))
             return str((datetime.now() - datetime(year, month, day)).days)
@@ -658,12 +658,12 @@ class DaysAccTileMessein(Tile):
 
 
 class EmptyTile(Tile):
-    def __init__(self, *args, title='', **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         Tile.__init__(self, *args, **kwargs)
 
 
 class FlysprayTile(Tile):
-    def __init__(self, *args, title='', **kwargs):
+    def __init__(self, *args, title: str = '', **kwargs) -> None:
         Tile.__init__(self, *args, **kwargs)
         # public
         self.title = title
@@ -677,12 +677,7 @@ class FlysprayTile(Tile):
         tk.Label(self, textvariable=self._msg_text, bg=self.cget('bg'), fg=Colors.TXT,
                  wraplength=750, justify=tk.LEFT, font=('courier', 13, 'bold')).pack(expand=True)
 
-    @property
-    def l_items(self):
-        return self._l_items
-
-    @l_items.setter
-    def l_items(self, value):
+    def load(self, value: List[str]):
         # check type
         try:
             value = list(value)
@@ -733,11 +728,11 @@ class GaugeTile(Tile):
         self.can.create_arc(20, 10, 200, 200, extent=108, start=36, style='arc', outline='black')
 
     @property
-    def percent(self):
+    def percent(self) -> float:
         return self._percent
 
     @percent.setter
-    def percent(self, value):
+    def percent(self, value: float):
         # check type
         try:
             value = float(value)
@@ -751,11 +746,11 @@ class GaugeTile(Tile):
             self._on_data_change()
 
     @property
-    def header_str(self):
+    def header_str(self) -> str:
         return self._head_str
 
     @header_str.setter
-    def header_str(self, value):
+    def header_str(self, value: str):
         # check type
         try:
             value = str(value)
@@ -793,7 +788,7 @@ class GaugeTile(Tile):
             self.can.configure(bg=Colors.NA)
             self._str_title.set('%s (%s)' % (self.title, 'N/A'))
 
-    def _set_arrow(self, ratio):
+    def _set_arrow(self, ratio: float):
         # normalize ratio : 0.2 to 0.8
         ratio = ratio * 0.6 + 0.2
         # compute arrow head
@@ -811,18 +806,15 @@ class ImageRawTile(Tile):
         self.lbl_img = tk.Label(self, bg=self.cget('bg'))
         self.lbl_img.pack(expand=True)
 
-    @property
-    def raw_display(self):
-        return self.raw_display
-
-    @raw_display.setter
-    def raw_display(self, value: bytes):
+    def load(self, img: bytes, crop: tuple = None):
         try:
             widget_size = (self.winfo_width(), self.winfo_height())
             # display current image file if raw_img is set
-            if value:
+            if img:
                 # RAW img data to Pillow (PIL) image
-                pil_img = PIL.Image.open(io.BytesIO(value))
+                pil_img = PIL.Image.open(io.BytesIO(img))
+                # apply crop (by default do nothing)
+                pil_img = pil_img.crop(crop)
                 # force image size to widget size
                 pil_img.thumbnail(widget_size)
             else:
@@ -842,19 +834,14 @@ class ImageRawTile(Tile):
             logging.error(traceback.format_exc())
 
 
-class ImageRawCarouselTile(Tile):
+class ImageRawCarouselTile(ImageRawTile):
     def __init__(self, *args, raw_img_tag_d: Tag, update_ms: int = 20_000, **kwargs):
-        Tile.__init__(self, *args, **kwargs)
+        ImageRawTile.__init__(self, *args, **kwargs)
         # public
         self.raw_img_tag_d = raw_img_tag_d
         # private
         self._playlist = []
         self._skip_n_cycle = 0
-        # tk widget init
-        # don't remove tk_img: keep a ref to avoid del by garbage collect
-        self.tk_img = tk.PhotoImage()
-        self.lbl_img = tk.Label(self, bg=self.cget('bg'))
-        self.lbl_img.pack(expand=True)
         # bind function for skip update
         self.bind('<Button-1>', self._on_click)
         self.lbl_img.bind('<Button-1>', self._on_click)
@@ -863,36 +850,6 @@ class ImageRawCarouselTile(Tile):
         # init image change_s rate
         if update_ms:
             self.init_cyclic_update(every_ms=update_ms)
-
-    @property
-    def raw_display(self):
-        return self.raw_display
-
-    @raw_display.setter
-    def raw_display(self, value):
-        try:
-            widget_size = (self.winfo_width(), self.winfo_height())
-            # display current image file if raw_img is set
-            if value:
-                # RAW img data to Pillow (PIL) image
-                pil_img = PIL.Image.open(io.BytesIO(value))
-                # force image size to widget size
-                pil_img.thumbnail(widget_size)
-            else:
-                # create a replace 'n/a' image
-                pil_img = PIL.Image.new('RGB', widget_size, Colors.PINK)
-                txt = 'n/a'
-                draw = PIL.ImageDraw.Draw(pil_img)
-                font = PIL.ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeMono.ttf', 24)
-                left, top, right, bottom = draw.textbbox((0, 0), txt, font=font)
-                x = (widget_size[0] - (right - left)) / 2
-                y = (widget_size[1] - (bottom - top)) / 2
-                draw.text((x, y), txt, fill='black', font=font)
-            # update image label
-            self.tk_img = PIL.ImageTk.PhotoImage(pil_img)
-            self.lbl_img.configure(image=self.tk_img)
-        except Exception:
-            logging.error(traceback.format_exc())
 
     def update(self):
         # display next image or skip this if skip counter is set
@@ -906,7 +863,7 @@ class ImageRawCarouselTile(Tile):
         while True:
             try:
                 img_name = self._playlist.pop(0)
-                self.raw_display = self.raw_img_tag_d.get(img_name)
+                self.load(self.raw_img_tag_d.get(img_name))
                 break
             except IndexError:
                 # refill playlist
@@ -961,11 +918,11 @@ class NewsBannerTile(Tile):
         self.init_cyclic_update(every_ms=200)
 
     @property
-    def l_titles(self):
+    def l_titles(self) -> List[str]:
         return self._l_titles
 
     @l_titles.setter
-    def l_titles(self, value):
+    def l_titles(self, value: List[str]):
         # check type
         try:
             value = list(value)
@@ -1054,53 +1011,6 @@ class PdfLauncherTile(Tile):
             self._ps_l.remove(ps)
 
 
-class TwitterTile(Tile):
-    def __init__(self, *args, **kwargs):
-        Tile.__init__(self, *args, **kwargs)
-        # public
-        # private
-        self._l_tweet = None
-        self._tw_text = tk.StringVar()
-        self._tw_text.set('n/a')
-        self._tw_index = 0
-        # tk job
-        self.configure(bg=Colors.TWEET)
-        tk.Label(self, text='live twitter: GRTgaz', bg=self.cget('bg'), fg=Colors.TXT,
-                 font=('courier', 14, 'bold', 'underline')).pack()
-        tk.Label(self, textvariable=self._tw_text, bg=self.cget('bg'), fg=Colors.TXT,
-                 wraplength=550, font=('courier', 14, 'bold')).pack(expand=True)
-        # auto-update tweet rotate every 12s
-        self.init_cyclic_update(every_ms=12_000)
-
-    @property
-    def l_tweet(self):
-        return self._l_tweet
-
-    @l_tweet.setter
-    def l_tweet(self, value):
-        # check type
-        try:
-            value = list(value)
-        except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._l_tweet != value:
-            self._l_tweet = value
-            # priority fart last tweet
-            self._tw_index = 0
-            self.update()
-
-    def update(self):
-        if self.l_tweet:
-            if self._tw_index >= len(self._l_tweet):
-                self._tw_index = 0
-            self._tw_text.set(self._l_tweet[self._tw_index])
-            self._tw_index += 1
-        else:
-            self._tw_index = 0
-            self._tw_text.set('n/a')
-
-
 class VigilanceTile(Tile):
     VIG_LVL = ['verte', 'jaune', 'orange', 'rouge']
     VIG_COLOR = [Colors.GREEN, Colors.YELLOW, Colors.ORANGE, Colors.RED]
@@ -1127,11 +1037,11 @@ class VigilanceTile(Tile):
         tk.Label(self, textvariable=self._risk_str, font=('', 8), bg=Colors.NA, fg=Colors.TXT).pack()
 
     @property
-    def vig_level(self):
+    def level(self):
         return self._vig_level
 
-    @vig_level.setter
-    def vig_level(self, value):
+    @level.setter
+    def level(self, value: int):
         # check type
         try:
             value = int(value) - 1
@@ -1143,11 +1053,11 @@ class VigilanceTile(Tile):
             self._on_data_change()
 
     @property
-    def risk_ids(self):
+    def risk_ids_l(self):
         return self._risk_ids
 
-    @risk_ids.setter
-    def risk_ids(self, value):
+    @risk_ids_l.setter
+    def risk_ids_l(self, value: List[int]):
         # check type
         try:
             value = [int(i) for i in list(value)]

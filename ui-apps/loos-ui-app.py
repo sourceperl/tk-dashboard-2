@@ -178,11 +178,11 @@ class LiveTilesTab(TilesTab):
 
     def update(self):
         # traffic map
-        self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
+        self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get())
         # atmo
-        self.tl_img_atmo.raw_display = Tags.IMG_ATMO_HDF.get()
+        self.tl_img_atmo.load(Tags.IMG_ATMO_HDF.get())
         # GRT
-        self.tl_img_grt.raw_display = Tags.IMG_LOGO_GRT.get()
+        self.tl_img_grt.load(Tags.IMG_LOGO_GRT.get())
         # acc days stat
         self.tl_acc.acc_date_dts = Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DTS'))
         self.tl_acc.acc_date_digne = Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DIGNE'))
@@ -190,13 +190,13 @@ class LiveTilesTab(TilesTab):
         self.tl_weath.w_today_dict = Tags.D_W_TODAY_LOOS.get()
         self.tl_weath.w_forecast_dict = Tags.D_W_FORECAST_LOOS.get()
         # air Dunkerque
-        self.tl_atmo_dunk.qlt_index = Tags.D_ATMO_QUALITY.get(path='dunkerque')
+        self.tl_atmo_dunk.level = Tags.D_ATMO_QUALITY.get(path='dunkerque')
         # air Lille
-        self.tl_atmo_lil.qlt_index = Tags.D_ATMO_QUALITY.get(path='lille')
+        self.tl_atmo_lil.level = Tags.D_ATMO_QUALITY.get(path='lille')
         # air Maubeuge
-        self.tl_atmo_maub.qlt_index = Tags.D_ATMO_QUALITY.get(path='maubeuge')
+        self.tl_atmo_maub.level = Tags.D_ATMO_QUALITY.get(path='maubeuge')
         # air Saint-Quentin
-        self.tl_atmo_sque.qlt_index = Tags.D_ATMO_QUALITY.get(path='saint-quentin')
+        self.tl_atmo_sque.level = Tags.D_ATMO_QUALITY.get(path='saint-quentin')
         # update news widget
         self.tl_news.l_titles = Tags.D_NEWS_LOCAL.get()
         # gauges update
@@ -219,22 +219,22 @@ class LiveTilesTab(TilesTab):
         self.tl_g_qsc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_REAL_DTS')),
                                               Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_OBJ_DTS')))
         # vigilance
-        self.tl_vig_59.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level'))
-        self.tl_vig_59.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id'))
-        self.tl_vig_62.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level'))
-        self.tl_vig_62.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id'))
-        self.tl_vig_80.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '80', 'vig_level'))
-        self.tl_vig_80.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '80', 'risk_id'))
-        self.tl_vig_02.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '02', 'vig_level'))
-        self.tl_vig_02.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '02', 'risk_id'))
-        self.tl_vig_60.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '60', 'vig_level'))
-        self.tl_vig_60.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '60', 'risk_id'))
+        self.tl_vig_59.level = Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level'))
+        self.tl_vig_59.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id'))
+        self.tl_vig_62.level = Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level'))
+        self.tl_vig_62.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id'))
+        self.tl_vig_80.level = Tags.D_WEATHER_VIG.get(path=('department', '80', 'vig_level'))
+        self.tl_vig_80.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '80', 'risk_id'))
+        self.tl_vig_02.level = Tags.D_WEATHER_VIG.get(path=('department', '02', 'vig_level'))
+        self.tl_vig_02.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '02', 'risk_id'))
+        self.tl_vig_60.level = Tags.D_WEATHER_VIG.get(path=('department', '60', 'vig_level'))
+        self.tl_vig_60.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '60', 'risk_id'))
         # Watts news
         self.tl_watts.pwr = Tags.MET_PWR_ACT.get()
         self.tl_watts.today_wh = Tags.MET_TODAY_WH.get()
         self.tl_watts.yesterday_wh = Tags.MET_YESTERDAY_WH.get()
         # flyspray
-        self.tl_fly.l_items = Tags.L_FLYSPRAY_RSS.get()
+        self.tl_fly.load(Tags.L_FLYSPRAY_RSS.get())
 
     def _on_click_empty_tile(self):
         AsyncTasks.redis_foo_pub.send('click on empty tile')

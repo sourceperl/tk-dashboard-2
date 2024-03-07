@@ -169,26 +169,26 @@ class LiveTilesTab(TilesTab):
 
     def update(self):
         # traffic map
-        self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
+        self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get())
         # atmo
-        self.tl_img_atmo.raw_display = Tags.IMG_ATMO_GE.get()
+        self.tl_img_atmo.load(Tags.IMG_ATMO_GE.get())
         # GRT
-        self.tl_img_grt.raw_display = Tags.IMG_LOGO_GRT.get()
+        self.tl_img_grt.load(Tags.IMG_LOGO_GRT.get())
         # DIR-Est webcams
-        self.tl_img_houdemont.raw_display = Tags.IMG_DIR_CAM_HOUDEMONT.get()
-        self.tl_img_velaine.raw_display = Tags.IMG_DIR_CAM_VELAINE.get()
-        self.tl_img_st_nicolas.raw_display = Tags.IMG_DIR_CAM_ST_NICOLAS.get()
-        self.tl_img_flavigny.raw_display = Tags.IMG_DIR_CAM_FLAVIGNY.get()
+        self.tl_img_houdemont.load = Tags.IMG_DIR_CAM_HOUDEMONT.get()
+        self.tl_img_velaine.load = Tags.IMG_DIR_CAM_VELAINE.get()
+        self.tl_img_st_nicolas.load = Tags.IMG_DIR_CAM_ST_NICOLAS.get()
+        self.tl_img_flavigny.load = Tags.IMG_DIR_CAM_FLAVIGNY.get()
         # acc days stat
         self.tl_acc.acc_date_dts = Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DTS'))
         # air Nancy
-        self.tl_atmo_nancy.qlt_index = Tags.D_ATMO_QUALITY.get(path='nancy')
+        self.tl_atmo_nancy.level = Tags.D_ATMO_QUALITY.get(path='nancy')
         # air Metz
-        self.tl_atmo_metz.qlt_index = Tags.D_ATMO_QUALITY.get(path='metz')
+        self.tl_atmo_metz.level = Tags.D_ATMO_QUALITY.get(path='metz')
         # air Reims
-        self.tl_atmo_reims.qlt_index = Tags.D_ATMO_QUALITY.get(path='reims')
+        self.tl_atmo_reims.level = Tags.D_ATMO_QUALITY.get(path='reims')
         # air Strasbourg
-        self.tl_atmo_stras.qlt_index = Tags.D_ATMO_QUALITY.get(path='strasbourg')
+        self.tl_atmo_stras.level = Tags.D_ATMO_QUALITY.get(path='strasbourg')
         # empty area(s)
         self.tl_empty1 = EmptyTile(self)
         self.tl_empty1.set_tile(row=2, column=5, rowspan=2, columnspan=8)
@@ -216,18 +216,18 @@ class LiveTilesTab(TilesTab):
         self.tl_g_qsc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_REAL_DTS')),
                                               Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_OBJ_DTS')))
         # weather vigilance
-        self.tl_vig_54.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '54', 'vig_level'))
-        self.tl_vig_54.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '54', 'risk_id'))
-        self.tl_vig_55.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '55', 'vig_level'))
-        self.tl_vig_55.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '55', 'risk_id'))
-        self.tl_vig_57.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '57', 'vig_level'))
-        self.tl_vig_57.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '57', 'risk_id'))
-        self.tl_vig_88.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '88', 'vig_level'))
-        self.tl_vig_88.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '88', 'risk_id'))
-        self.tl_vig_67.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '67', 'vig_level'))
-        self.tl_vig_67.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '67', 'risk_id'))
+        self.tl_vig_54.level = Tags.D_WEATHER_VIG.get(path=('department', '54', 'vig_level'))
+        self.tl_vig_54.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '54', 'risk_id'))
+        self.tl_vig_55.level = Tags.D_WEATHER_VIG.get(path=('department', '55', 'vig_level'))
+        self.tl_vig_55.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '55', 'risk_id'))
+        self.tl_vig_57.level = Tags.D_WEATHER_VIG.get(path=('department', '57', 'vig_level'))
+        self.tl_vig_57.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '57', 'risk_id'))
+        self.tl_vig_88.level = Tags.D_WEATHER_VIG.get(path=('department', '88', 'vig_level'))
+        self.tl_vig_88.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '88', 'risk_id'))
+        self.tl_vig_67.level = Tags.D_WEATHER_VIG.get(path=('department', '67', 'vig_level'))
+        self.tl_vig_67.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '67', 'risk_id'))
         # flyspray
-        self.tl_fly.l_items = Tags.L_FLYSPRAY_RSS.get()
+        self.tl_fly.load(Tags.L_FLYSPRAY_RSS.get())
 
 
 # main

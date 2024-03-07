@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-from typing import Any
 import tkinter as tk
 from tkinter import ttk
 from lib.dashboard_ui import \
@@ -122,18 +121,18 @@ class LiveTilesTab(TilesTab):
 
     def update(self):
         # atmo
-        self.tl_img_atmo.raw_display = Tags.IMG_ATMO_HDF.get()
+        self.tl_img_atmo.load(Tags.IMG_ATMO_HDF.get())
         # air Lille
-        self.tl_atmo_lil.qlt_index = Tags.D_ATMO_QUALITY.get(path='lille')
+        self.tl_atmo_lil.level = Tags.D_ATMO_QUALITY.get(path='lille')
         # mf
-        self.tl_img_mf.raw_display = Tags.IMG_MF.get()
+        self.tl_img_mf.load(Tags.IMG_MF.get())
         # vigilance
-        self.tl_vig_59.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level'))
-        self.tl_vig_59.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id'))
-        self.tl_vig_62.vig_level = Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level'))
-        self.tl_vig_62.risk_ids = Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id'))
+        self.tl_vig_59.level = Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level'))
+        self.tl_vig_59.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id'))
+        self.tl_vig_62.level = Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level'))
+        self.tl_vig_62.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id'))
         # traffic map
-        self.tl_tf_map.raw_display = Tags.IMG_TRAFFIC_MAP.get()
+        self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get(), crop=(30, 0, 530, 328))
         # outdoor ble data
         temp_c = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'temp_c')), fmt='>6.1f')
         hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_p')), fmt='>6.1f')
