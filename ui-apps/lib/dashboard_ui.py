@@ -447,49 +447,44 @@ class AirQualityTile(Tile):
         # public
         self.city = city
         # private
-        self._qlt_index = 0
-        self._index_str = tk.StringVar()
+        self._level = 0
+        self._level_str = tk.StringVar()
         self._status_str = tk.StringVar()
-        self._index_str.set('N/A')
+        self._level_str.set('N/A')
         self._status_str.set('N/A')
         # tk job
         tk.Label(self, text=city, font='bold', fg=Colors.TXT).pack()
         tk.Label(self).pack()
-        tk.Label(self, textvariable=self._index_str, fg=Colors.TXT).pack()
+        tk.Label(self, textvariable=self._level_str, fg=Colors.TXT).pack()
         tk.Label(self, textvariable=self._status_str, fg=Colors.TXT).pack()
 
-    @property
-    def level(self):
-        return self._qlt_index
-
-    @level.setter
-    def level(self, value):
-        # check type
+    def load(self, level: int = None) -> None:
+        # enforce type
         try:
-            value = int(value)
+            level = int(level)
         except (TypeError, ValueError):
-            value = None
+            level = None
         # check change
-        if self._qlt_index != value:
-            self._qlt_index = value
+        if self._level != level:
+            self._level = level
             self._on_data_change()
 
     def _on_data_change(self):
         try:
-            self._index_str.set('%d/6' % self._qlt_index)
-            self._status_str.set(AirQualityTile.QUALITY_LVL[self._qlt_index])
+            self._level_str.set('%d/6' % self._level)
+            self._status_str.set(AirQualityTile.QUALITY_LVL[self._level])
         except (TypeError, ZeroDivisionError):
             # set tk var
-            self._index_str.set('N/A')
+            self._level_str.set('N/A')
             self._status_str.set('N/A')
             # choose tile color
             tile_color = Colors.NA
         else:
             # choose tile color
             tile_color = Colors.GREEN
-            if self._qlt_index > 4:
+            if self._level > 4:
                 tile_color = Colors.RED
-            elif self._qlt_index > 2:
+            elif self._level > 2:
                 tile_color = Colors.ORANGE
         # update tile and his childs color
         for w in self.winfo_children():
@@ -522,8 +517,8 @@ class DaysAccTileLoos(Tile):
     def __init__(self, *args, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         # private
-        self._acc_date_dts = None
-        self._acc_date_digne = None
+        self._date_dts = None
+        self._date_digne = None
         self._days_dts_str = tk.StringVar()
         self._days_digne_str = tk.StringVar()
         # tk stuff
@@ -551,45 +546,19 @@ class DaysAccTileLoos(Tile):
         # auto-update acc day counter every 5s
         self.init_cyclic_update(every_ms=5_000)
 
-    @property
-    def acc_date_dts(self) -> str:
-        return self._acc_date_dts
-
-    @acc_date_dts.setter
-    def acc_date_dts(self, value: str):
-        # check type
-        try:
-            value = str(value)
-        except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._acc_date_dts != value:
-            # check range
-            self._acc_date_dts = value
-            # update widget
-            self.update()
-
-    @property
-    def acc_date_digne(self) -> str:
-        return self._acc_date_digne
-
-    @acc_date_digne.setter
-    def acc_date_digne(self, value: str):
-        # check type
-        try:
-            value = str(value)
-        except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._acc_date_digne != value:
-            # check range
-            self._acc_date_digne = value
-            # update widget
+    def load(self, date_dts: str, date_digne: str) -> None:
+        # enforce type
+        date_dts = str(date_dts)
+        date_digne = str(date_digne)
+        # on change -> update widget
+        if self._date_dts != date_dts or self._date_digne != date_digne:
+            self._date_dts = date_dts
+            self._date_digne = date_digne
             self.update()
 
     def update(self):
-        self._days_dts_str.set(self.day_from_now(self._acc_date_dts))
-        self._days_digne_str.set(self.day_from_now(self._acc_date_digne))
+        self._days_dts_str.set(self.day_from_now(self._date_dts))
+        self._days_digne_str.set(self.day_from_now(self._date_digne))
 
     @staticmethod
     def day_from_now(date_str: str) -> str:
@@ -627,22 +596,12 @@ class DaysAccTileMessein(Tile):
         # auto-update acc day counter every 5s
         self.init_cyclic_update(every_ms=5_000)
 
-    @property
-    def acc_date_dts(self) -> str:
-        return self._acc_date_dts
-
-    @acc_date_dts.setter
-    def acc_date_dts(self, value: str):
-        # check type
-        try:
-            value = str(value)
-        except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._acc_date_dts != value:
-            # check range
-            self._acc_date_dts = value
-            # update widget
+    def load(self, date_dts: str) -> None:
+        # enforce type
+        date_dts = str(date_dts)
+        # on change -> update widget
+        if self._date_dts != date_dts:
+            self._date_dts = date_dts
             self.update()
 
     def update(self):
@@ -668,7 +627,7 @@ class FlysprayTile(Tile):
         # public
         self.title = title
         # private
-        self._l_items = None
+        self._task_l = None
         self._msg_text = tk.StringVar()
         self._msg_text.set('n/a')
         # tk job
@@ -677,24 +636,24 @@ class FlysprayTile(Tile):
         tk.Label(self, textvariable=self._msg_text, bg=self.cget('bg'), fg=Colors.TXT,
                  wraplength=750, justify=tk.LEFT, font=('courier', 13, 'bold')).pack(expand=True)
 
-    def load(self, value: List[str]):
-        # check type
+    def load(self, task_l: List[str]) -> None:
+        # enforce type
         try:
-            value = list(value)
+            task_l = list(task_l)
         except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._l_items != value:
-            self._l_items = value
-            self._on_data_change()
+            task_l = None
+        # on change -> update widget
+        if self._task_l != task_l:
+            self._task_l = task_l
+            self._on_change()
 
-    def _on_data_change(self):
+    def _on_change(self):
         TTE_MAX_NB = 12
         TTE_MAX_LEN = 75
         try:
             msg = ''
             # limit titles number
-            for title in self._l_items[:TTE_MAX_NB]:
+            for title in self._task_l[:TTE_MAX_NB]:
                 # limit title length
                 title = (title[:TTE_MAX_LEN - 2] + '..') if len(title) > TTE_MAX_LEN else title
                 msg += '%s\n' % title
@@ -716,7 +675,7 @@ class GaugeTile(Tile):
         # private
         self._str_title = tk.StringVar()
         self._str_title.set(self.title)
-        self._head_str = ''
+        self._head_str = None
         self._percent = None
         # tk build
         self.label = tk.Label(self, textvariable=self._str_title, font='bold', bg=Colors.BG, fg=Colors.TXT)
@@ -727,43 +686,23 @@ class GaugeTile(Tile):
         self.can.lower(self.can_arrow)
         self.can.create_arc(20, 10, 200, 200, extent=108, start=36, style='arc', outline='black')
 
-    @property
-    def percent(self) -> float:
-        return self._percent
-
-    @percent.setter
-    def percent(self, value: float):
-        # check type
+    def load(self, percent: Union[str, float], head_str: str) -> None:
+        # enforce type
         try:
-            value = float(value)
+            percent = float(percent)
         except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._percent != value:
-            # check range
-            self._percent = value
-            # update widget
-            self._on_data_change()
-
-    @property
-    def header_str(self) -> str:
-        return self._head_str
-
-    @header_str.setter
-    def header_str(self, value: str):
-        # check type
+            percent = None
         try:
-            value = str(value)
-        except (TypeError, ValueError):
-            value = ''
-        # check change
-        if self._head_str != value:
-            # check range
-            self._head_str = value
-            # update widget
-            self._on_data_change()
+            head_str = str(head_str)
+        except:
+            head_str = None
+        # on change -> update widget
+        if self._percent != percent or self._head_str != head_str:
+            self._percent = percent
+            self._head_str = head_str
+            self._on_change()
 
-    def _on_data_change(self):
+    def _on_change(self):
         # update widget
         try:
             # convert value
@@ -806,10 +745,15 @@ class ImageRawTile(Tile):
         self.lbl_img = tk.Label(self, bg=self.cget('bg'))
         self.lbl_img.pack(expand=True)
 
-    def load(self, img: bytes, crop: tuple = None):
+    def load(self, img: bytes, crop: tuple = None) -> None:
+        # enforce type
+        try:
+            img = bytes(img)
+        except (TypeError, ValueError):
+            img = None
+        # display current image or 'n/a' 
         try:
             widget_size = (self.winfo_width(), self.winfo_height())
-            # display current image file if raw_img is set
             if img:
                 # RAW img data to Pillow (PIL) image
                 pil_img = PIL.Image.open(io.BytesIO(img))
@@ -903,7 +847,7 @@ class NewsBannerTile(Tile):
         # public
         self.ban_nb_char = NewsBannerTile.BAN_MAX_NB_CHAR
         # private
-        self._l_titles = []
+        self._titles_l = []
         self._lbl_ban = tk.StringVar()
         self._next_ban_str = ''
         self._disp_ban_str = ''
@@ -917,22 +861,15 @@ class NewsBannerTile(Tile):
         # auto-update banner every 200ms
         self.init_cyclic_update(every_ms=200)
 
-    @property
-    def l_titles(self) -> List[str]:
-        return self._l_titles
-
-    @l_titles.setter
-    def l_titles(self, value: List[str]):
-        # check type
+    def load(self, titles_l: List[str]) -> None:
+        # enforce type
         try:
-            value = list(value)
+            titles_l = list(titles_l)
         except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._l_titles != value:
-            # check range
-            self._l_titles = value
-            # update widget
+            titles_l = None
+        # on change -> update widget
+        if self._titles_l != titles_l:
+            self._titles_l = titles_l
             self._on_data_change()
 
     def update(self):
@@ -951,7 +888,7 @@ class NewsBannerTile(Tile):
         try:
             # update banner
             self._next_ban_str = spaces_head
-            for title in self._l_titles:
+            for title in self._titles_l:
                 self._next_ban_str += title + spaces_head
         except TypeError:
             self._next_ban_str = spaces_head + 'n/a' + spaces_head
@@ -960,60 +897,9 @@ class NewsBannerTile(Tile):
             logging.error(traceback.format_exc())
 
 
-class PdfLauncherTile(Tile):
-    def __init__(self, *args, file, raw_tag, **kwargs):
-        Tile.__init__(self, *args, **kwargs)
-        # public
-        self.file = file
-        self.raw_tag = raw_tag
-        # private
-        self._front_name = os.path.splitext(self.file)[0].strip()
-        self._ps_l = list()
-        # tk stuff
-        self._name_lbl = tk.Label(self, text=self._front_name, wraplength=550,
-                                  bg=self.cget('bg'), fg=Colors.TXT, font=('courrier', 20, 'bold'))
-        self._name_lbl.pack(expand=True)
-        # bind function for open pdf file
-        self.bind('<Button-1>', self._on_click)
-        self._name_lbl.bind('<Button-1>', self._on_click)
-        self.bind('<Destroy>', self._on_unmap)
-        self.bind('<Unmap>', self._on_unmap)
-
-    def _on_click(self, _evt):
-        try:
-            # build a temp file with RAW pdf data from redis hash
-            raw_data = self.raw_tag.get(args={'file': self.file})
-            if raw_data:
-                tmp_f = tempfile.NamedTemporaryFile(prefix='board-', suffix='.pdf', delete=True)
-                tmp_f.write(raw_data)
-                # open it with xpdf
-                xpdf_geometry = '-geometry %sx%s' % (self.master.winfo_width(), self.master.winfo_height() - 10)
-                ps = subprocess.Popen(['/usr/bin/xpdf', xpdf_geometry, '-z page', '-cont', tmp_f.name],
-                                      stdin=subprocess.DEVNULL,
-                                      stdout=subprocess.DEVNULL,
-                                      stderr=subprocess.DEVNULL,
-                                      close_fds=True)
-                # keep process references for _on_unmap() job
-                self._ps_l.append(ps)
-                # remove temp file after xpdf startup
-                self.after(ms=1000, func=tmp_f.close)
-        except Exception:
-            logging.error(traceback.format_exc())
-
-    def _on_unmap(self, _evt):
-        # terminate all xpdf process on tab exit
-        # iterate on copy of process list
-        for ps in list(self._ps_l):
-            # terminate (ps wait for zombie process avoid)
-            ps.terminate()
-            ps.wait()
-            # remove ps from original list
-            self._ps_l.remove(ps)
-
-
 class VigilanceTile(Tile):
-    VIG_LVL = ['verte', 'jaune', 'orange', 'rouge']
-    VIG_COLOR = [Colors.GREEN, Colors.YELLOW, Colors.ORANGE, Colors.RED]
+    VIG_COLOR_STR = ['n/a', 'verte', 'jaune', 'orange', 'rouge']
+    VIG_COLOR = [Colors.NA, Colors.GREEN, Colors.YELLOW, Colors.ORANGE, Colors.RED]
     ID_RISK = ['n/a', 'vent', 'pluie', 'orages', 'crues', 'neige/verglas',
                'canicule', 'grand froid', 'avalanches', 'submersion']
 
@@ -1023,11 +909,9 @@ class VigilanceTile(Tile):
         self.department = department
         # private
         self._vig_level = None
-        self._risk_ids = []
+        self._risk_ids = None
         self._level_str = tk.StringVar()
         self._risk_str = tk.StringVar()
-        self._level_str.set('N/A')
-        self._risk_str.set('')
         # tk job
         self.configure(bg=Colors.NA)
         tk.Label(self, text='Vigilance', font='bold', bg=Colors.NA, fg=Colors.TXT).pack()
@@ -1035,49 +919,35 @@ class VigilanceTile(Tile):
         tk.Label(self, font=('', 2), bg=Colors.NA, fg=Colors.TXT).pack()
         tk.Label(self, textvariable=self._level_str, font='bold', bg=Colors.NA, fg=Colors.TXT).pack()
         tk.Label(self, textvariable=self._risk_str, font=('', 8), bg=Colors.NA, fg=Colors.TXT).pack()
+        # init widget with first call to _on_change()
+        self._on_change()
 
-    @property
-    def level(self):
-        return self._vig_level
-
-    @level.setter
-    def level(self, value: int):
-        # check type
+    def load(self, level: int, risk_id_l: List[int]) -> None:
+        # enforce type
         try:
-            value = int(value) - 1
+            level = int(level)
         except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._vig_level != value:
-            self._vig_level = value
-            self._on_data_change()
-
-    @property
-    def risk_ids_l(self):
-        return self._risk_ids
-
-    @risk_ids_l.setter
-    def risk_ids_l(self, value: List[int]):
-        # check type
+            level = None        
         try:
-            value = [int(i) for i in list(value)]
+            risk_id_l = list(risk_id_l)
         except (TypeError, ValueError):
-            value = []
-        # check change
-        if self._risk_ids != value:
-            self._risk_ids = value
-            self._on_data_change()
+            risk_id_l = None        
+        # on change -> update widget
+        if self._vig_level != level or self._risk_ids != risk_id_l:
+            self._vig_level = level
+            self._risk_ids = risk_id_l
+            self._on_change()
 
-    def _on_data_change(self):
+    def _on_change(self):
         # update color of tile and color str
         try:
-            level_str = VigilanceTile.VIG_LVL[self._vig_level].upper()
+            level_str = VigilanceTile.VIG_COLOR_STR[self._vig_level].upper()
             tile_color = VigilanceTile.VIG_COLOR[self._vig_level]
         except (IndexError, TypeError):
-            level_str = 'N/A'
+            level_str = 'n/a'
             tile_color = Colors.NA
         # apply to tk
-        self._level_str.set(f'{level_str}')
+        self._level_str.set(level_str)
         for w in self.winfo_children():
             w.configure(bg=tile_color)
         self.configure(bg=tile_color)
@@ -1098,8 +968,8 @@ class WattsTile(Tile):
         # public
         # private
         self._pwr = None
-        self._tdy_wh = None
-        self._ydy_wh = None
+        self._today_wh = None
+        self._yesterday_wh = None
         self._pwr_text = tk.StringVar()
         self._tdy_text = tk.StringVar()
         self._ydy_text = tk.StringVar()
@@ -1112,61 +982,25 @@ class WattsTile(Tile):
                  font=('courier', 14, 'bold')).pack(expand=True)
         tk.Label(self, textvariable=self._ydy_text, bg=self.cget('bg'), fg=Colors.TXT,
                  font=('courier', 14, 'bold')).pack(expand=True)
-        # public with accessor
-        self.pwr = None
-        self.today_wh = None
-        self.yesterday_wh = None
 
-    @property
-    def pwr(self):
-        return self._pwr
-
-    @pwr.setter
-    def pwr(self, value):
-        # check type
+    def load(self, pwr: float, today_wh: float, yesterday_wh: float) -> None:
+        # enforce type
         try:
-            value = int(value)
+            self._pwr = float(pwr)
         except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._pwr != value:
-            self._pwr = value
-        # update tk lbl
+            self._pwr = None
+        try:
+            self._today_wh = float(today_wh)
+        except (TypeError, ValueError):
+            self._today_wh = None        
+        try:
+            self._yesterday_wh = float(yesterday_wh)
+        except (TypeError, ValueError):
+            self._yesterday_wh = None
+        # update widget
         self._pwr_text.set('  P %5s w  ' % ('n/a' if self._pwr is None else self._pwr))
-
-    @property
-    def today_wh(self):
-        return self._tdy_wh
-
-    @today_wh.setter
-    def today_wh(self, value):
-        # check type
-        try:
-            value = float(value)
-        except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._tdy_wh != value:
-            self._tdy_wh = value
-        # update tk lbl
-        self._tdy_text.set('  J %5s kwh' % ('n/a' if self._tdy_wh is None else round(self._tdy_wh / 1000)))
-
-    @property
-    def yesterday_wh(self):
-        return self._ydy_wh
-
-    @yesterday_wh.setter
-    def yesterday_wh(self, value):
-        # check type
-        try:
-            value = float(value)
-        except (TypeError, ValueError):
-            value = None
-        # check change
-        if self._ydy_wh != value:
-            self._ydy_wh = value
-        # update tk lbl
-        self._ydy_text.set('J-1 %5s kwh' % ('n/a' if self._ydy_wh is None else round(self._ydy_wh / 1000)))
+        self._tdy_text.set('  J %5s kwh' % ('n/a' if self._today_wh is None else round(self._today_wh / 1000)))
+        self._ydy_text.set('J-1 %5s kwh' % ('n/a' if self._yesterday_wh is None else round(self._yesterday_wh / 1000)))
 
 
 class WeatherTile(Tile):
@@ -1206,26 +1040,22 @@ class WeatherTile(Tile):
         self.lbl_today.grid(column=0)
         self.lbl_today.grid_propagate(False)
 
-    @property
-    def w_today_dict(self):
-        return self._w_today_dict
-
-    @w_today_dict.setter
-    def w_today_dict(self, value):
-        # check change
-        if self._w_today_dict != value:
-            self._w_today_dict = value
+    def load(self, w_today_dict: dict, w_forecast_dict: dict) -> None:
+        # enforce type
+        try:
+            w_today_dict = dict(w_today_dict)
+        except (TypeError, ValueError):
+            w_today_dict = None
+        try:
+            w_forecast_dict = dict(w_forecast_dict)
+        except (TypeError, ValueError):
+            w_forecast_dict = None
+        # on change -> update widget
+        if self._w_today_dict != w_today_dict:
+            self._w_today_dict = w_today_dict
             self._on_today_change()
-
-    @property
-    def w_forecast_dict(self):
-        return self._w_forecast_dict
-
-    @w_forecast_dict.setter
-    def w_forecast_dict(self, value):
-        # check change
-        if self._w_forecast_dict != value:
-            self._w_forecast_dict = value
+        if self._w_forecast_dict != w_forecast_dict:
+            self._w_forecast_dict = w_forecast_dict
             self._on_forecast_change()
 
     def _on_today_change(self):
@@ -1282,3 +1112,54 @@ class WeatherTile(Tile):
             # update days labels to 'n/a' error message
             for i in range(4):
                 self._days_lbl[i].configure(text='n/a')
+
+
+class PdfLauncherTile(Tile):
+    def __init__(self, *args, file, raw_tag, **kwargs):
+        Tile.__init__(self, *args, **kwargs)
+        # public
+        self.file = file
+        self.raw_tag = raw_tag
+        # private
+        self._front_name = os.path.splitext(self.file)[0].strip()
+        self._ps_l = list()
+        # tk stuff
+        self._name_lbl = tk.Label(self, text=self._front_name, wraplength=550,
+                                  bg=self.cget('bg'), fg=Colors.TXT, font=('courrier', 20, 'bold'))
+        self._name_lbl.pack(expand=True)
+        # bind function for open pdf file
+        self.bind('<Button-1>', self._on_click)
+        self._name_lbl.bind('<Button-1>', self._on_click)
+        self.bind('<Destroy>', self._on_unmap)
+        self.bind('<Unmap>', self._on_unmap)
+
+    def _on_click(self, _evt):
+        try:
+            # build a temp file with RAW pdf data from redis hash
+            raw_data = self.raw_tag.get(args={'file': self.file})
+            if raw_data:
+                tmp_f = tempfile.NamedTemporaryFile(prefix='board-', suffix='.pdf', delete=True)
+                tmp_f.write(raw_data)
+                # open it with xpdf
+                xpdf_geometry = '-geometry %sx%s' % (self.master.winfo_width(), self.master.winfo_height() - 10)
+                ps = subprocess.Popen(['/usr/bin/xpdf', xpdf_geometry, '-z page', '-cont', tmp_f.name],
+                                      stdin=subprocess.DEVNULL,
+                                      stdout=subprocess.DEVNULL,
+                                      stderr=subprocess.DEVNULL,
+                                      close_fds=True)
+                # keep process references for _on_unmap() job
+                self._ps_l.append(ps)
+                # remove temp file after xpdf startup
+                self.after(ms=1000, func=tmp_f.close)
+        except Exception:
+            logging.error(traceback.format_exc())
+
+    def _on_unmap(self, _evt):
+        # terminate all xpdf process on tab exit
+        # iterate on copy of process list
+        for ps in list(self._ps_l):
+            # terminate (ps wait for zombie process avoid)
+            ps.terminate()
+            ps.wait()
+            # remove ps from original list
+            self._ps_l.remove(ps)

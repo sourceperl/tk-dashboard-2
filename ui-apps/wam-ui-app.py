@@ -37,6 +37,12 @@ class CustomLabelTile(Tile):
         tk.Label(self, textvariable=self.str_var, font=('bold', 12), bg=self.cget('bg'),
                  anchor=tk.W, justify=tk.LEFT, fg=Colors.TXT).place(relx=0, rely=0)
 
+    def load(self, txt: str) -> None:
+        # enforce type
+        txt = str(txt)
+        # update widget
+        self.str_var.set(txt)
+
 
 class MainApp(tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -123,24 +129,24 @@ class LiveTilesTab(TilesTab):
         # atmo
         self.tl_img_atmo.load(Tags.IMG_ATMO_HDF.get())
         # air Lille
-        self.tl_atmo_lil.level = Tags.D_ATMO_QUALITY.get(path='lille')
+        self.tl_atmo_lil.load(level=Tags.D_ATMO_QUALITY.get(path='lille'))
         # mf
         self.tl_img_mf.load(Tags.IMG_MF.get())
         # vigilance
-        self.tl_vig_59.level = Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level'))
-        self.tl_vig_59.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id'))
-        self.tl_vig_62.level = Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level'))
-        self.tl_vig_62.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id'))
+        self.tl_vig_59.load(level=Tags.D_WEATHER_VIG.get(path=('department', '59', 'vig_level')),
+                            risk_id_l=Tags.D_WEATHER_VIG.get(path=('department', '59', 'risk_id')))
+        self.tl_vig_62.load(level=Tags.D_WEATHER_VIG.get(path=('department', '62', 'vig_level')),
+                            risk_id_l=Tags.D_WEATHER_VIG.get(path=('department', '62', 'risk_id')))
         # traffic map
         self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get(), crop=(30, 0, 530, 328))
         # outdoor ble data
         temp_c = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'temp_c')), fmt='>6.1f')
         hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_p')), fmt='>6.1f')
-        self.tl_ext.str_var.set(f'Extérieur\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
+        self.tl_ext.load(txt=f'Extérieur\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
         # kitchen ble data
         temp_c = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'temp_c')), fmt='>6.1f')
         hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_p')), fmt='>6.1f')
-        self.tl_kit.str_var.set(f'Cuisine\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
+        self.tl_kit.load(txt=f'Cuisine\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
         # metar data
         update_fr = fmt_value(Tags.METAR_DATA.get(path='update_fr'), fmt='', alt_str='\t')
         press_hpa = fmt_value(Tags.METAR_DATA.get(path='press'), fmt='>5.0f')
@@ -150,13 +156,13 @@ class LiveTilesTab(TilesTab):
         w_dir = fmt_value(Tags.METAR_DATA.get(path='w_dir'), fmt='')
         w_gust_kmh = fmt_value(Tags.METAR_DATA.get(path='w_gust'), fmt='>3.0f', alt_str='')
         w_gust_kmh_str = f'(\N{LEAF FLUTTERING IN WIND} {w_gust_kmh} km/h)' if w_gust_kmh else ''
-        self.tl_metar.str_var.set(f'Lesquin (station Météo-France)\n'
-                                  f'{update_fr}\t\N{TIMER CLOCK} {press_hpa} hPa\n'
-                                  f'\N{THERMOMETER} {temp_c} °C'
-                                  f'\t\N{WIND BLOWING FACE} {w_speed_kmh} km/h\n'
-                                  f'\N{THERMOMETER}\N{BLACK DROPLET} {dewpt_c} °C  '
-                                  f'\t\N{WHITE-FEATHERED RIGHTWARDS ARROW}   {w_dir}'
-                                  f' {w_gust_kmh_str}')
+        self.tl_metar.load(txt=f'Lesquin (station Météo-France)\n'
+                           f'{update_fr}\t\N{TIMER CLOCK} {press_hpa} hPa\n'
+                           f'\N{THERMOMETER} {temp_c} °C'
+                           f'\t\N{WIND BLOWING FACE} {w_speed_kmh} km/h\n'
+                           f'\N{THERMOMETER}\N{BLACK DROPLET} {dewpt_c} °C  '
+                           f'\t\N{WHITE-FEATHERED RIGHTWARDS ARROW}   {w_dir}'
+                           f' {w_gust_kmh_str}')
 
 
 # main

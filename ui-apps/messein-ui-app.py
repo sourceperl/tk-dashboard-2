@@ -149,6 +149,11 @@ class LiveTilesTab(TilesTab):
         self.tl_vig_88.set_tile(row=4, column=3)
         self.tl_vig_67 = VigilanceTile(self, department='Bas-Rhin')
         self.tl_vig_67.set_tile(row=4, column=4)
+        # empty area(s)
+        self.tl_empty1 = EmptyTile(self)
+        self.tl_empty1.set_tile(row=2, column=5, rowspan=2, columnspan=8)
+        self.tl_empty2 = EmptyTile(self)
+        self.tl_empty2.set_tile(row=4, column=5, rowspan=1, columnspan=2)
         # flyspray
         self.tl_fly = FlysprayTile(self, title='live Flyspray DTS Est')
         self.tl_fly.set_tile(row=5, column=0, rowspan=3, columnspan=7)
@@ -180,54 +185,49 @@ class LiveTilesTab(TilesTab):
         self.tl_img_st_nicolas.load = Tags.IMG_DIR_CAM_ST_NICOLAS.get()
         self.tl_img_flavigny.load = Tags.IMG_DIR_CAM_FLAVIGNY.get()
         # acc days stat
-        self.tl_acc.acc_date_dts = Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DTS'))
+        self.tl_acc.load(date_dts=Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DTS')))
         # air Nancy
-        self.tl_atmo_nancy.level = Tags.D_ATMO_QUALITY.get(path='nancy')
+        self.tl_atmo_nancy.load(level=Tags.D_ATMO_QUALITY.get(path='nancy'))
         # air Metz
-        self.tl_atmo_metz.level = Tags.D_ATMO_QUALITY.get(path='metz')
+        self.tl_atmo_metz.load(level=Tags.D_ATMO_QUALITY.get(path='metz'))
         # air Reims
-        self.tl_atmo_reims.level = Tags.D_ATMO_QUALITY.get(path='reims')
+        self.tl_atmo_reims.load(level=Tags.D_ATMO_QUALITY.get(path='reims'))
         # air Strasbourg
-        self.tl_atmo_stras.level = Tags.D_ATMO_QUALITY.get(path='strasbourg')
-        # empty area(s)
-        self.tl_empty1 = EmptyTile(self)
-        self.tl_empty1.set_tile(row=2, column=5, rowspan=2, columnspan=8)
-        self.tl_empty2 = EmptyTile(self)
-        self.tl_empty2.set_tile(row=4, column=5, rowspan=1, columnspan=2)
+        self.tl_atmo_stras.load(level=Tags.D_ATMO_QUALITY.get(path='strasbourg'))
         # news banner
-        self.tl_news.l_titles = Tags.D_NEWS_LOCAL.get()
+        self.tl_news.load(titles_l=Tags.D_NEWS_LOCAL.get())
         # gauges update
-        self.tl_g_veh.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_JAUGE_DTS'))
-        self.tl_g_veh.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_OBJ_DTS')))
-        self.tl_g_loc.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_JAUGE_DTS'))
-        self.tl_g_loc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_OBJ_DTS')))
-        self.tl_g_req.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_JAUGE_DTS'))
-        self.tl_g_req.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_OBJ_DTS')))
-        self.tl_g_vcs.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_JAUGE_DTS'))
-        self.tl_g_vcs.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_OBJ_DTS')))
-        self.tl_g_vst.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'VST_JAUGE_DTS'))
-        self.tl_g_vst.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'VST_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(path=('tags', 'VST_OBJ_DTS')))
-        self.tl_g_qsc.percent = Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_JAUGE_DTS'))
-        self.tl_g_qsc.header_str = '%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_REAL_DTS')),
-                                              Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_OBJ_DTS')))
+        self.tl_g_veh.load(percent=Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_JAUGE_DTS')),
+                           head_str='%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_REAL_DTS')),
+                                               Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_OBJ_DTS'))))
+        self.tl_g_loc.load(percent=Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_JAUGE_DTS')),
+                           head_str='%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_REAL_DTS')),
+                                               Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_LOC_OBJ_DTS'))))
+        self.tl_g_req.load(percent=Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_JAUGE_DTS')),
+                           head_str='%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_REAL_DTS')),
+                                                 Tags.D_GSHEET_GRT.get(path=('tags', 'R_EQU_OBJ_DTS'))))
+        self.tl_g_vcs.load(percent=Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_JAUGE_DTS')),
+                           head_str='%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_REAL_DTS')),
+                                               Tags.D_GSHEET_GRT.get(path=('tags', 'VCS_OBJ_DTS'))))
+        self.tl_g_vst.load(percent=Tags.D_GSHEET_GRT.get(path=('tags', 'VST_JAUGE_DTS')),
+                           head_str='%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'VST_REAL_DTS')),
+                                               Tags.D_GSHEET_GRT.get(path=('tags', 'VST_OBJ_DTS'))))
+        self.tl_g_qsc.load(percent=Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_JAUGE_DTS')),
+                           head_str='%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_REAL_DTS')),
+                                               Tags.D_GSHEET_GRT.get(path=('tags', 'Q_HRE_OBJ_DTS'))))
         # weather vigilance
-        self.tl_vig_54.level = Tags.D_WEATHER_VIG.get(path=('department', '54', 'vig_level'))
-        self.tl_vig_54.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '54', 'risk_id'))
-        self.tl_vig_55.level = Tags.D_WEATHER_VIG.get(path=('department', '55', 'vig_level'))
-        self.tl_vig_55.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '55', 'risk_id'))
-        self.tl_vig_57.level = Tags.D_WEATHER_VIG.get(path=('department', '57', 'vig_level'))
-        self.tl_vig_57.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '57', 'risk_id'))
-        self.tl_vig_88.level = Tags.D_WEATHER_VIG.get(path=('department', '88', 'vig_level'))
-        self.tl_vig_88.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '88', 'risk_id'))
-        self.tl_vig_67.level = Tags.D_WEATHER_VIG.get(path=('department', '67', 'vig_level'))
-        self.tl_vig_67.risk_ids_l = Tags.D_WEATHER_VIG.get(path=('department', '67', 'risk_id'))
+        self.tl_vig_54.load(level=Tags.D_WEATHER_VIG.get(path=('department', '54', 'vig_level')),
+                            risk_id_l=Tags.D_WEATHER_VIG.get(path=('department', '54', 'risk_id')))
+        self.tl_vig_55.load(level=Tags.D_WEATHER_VIG.get(path=('department', '55', 'vig_level')),
+                            risk_id_l=Tags.D_WEATHER_VIG.get(path=('department', '55', 'risk_id')))
+        self.tl_vig_57.load(level=Tags.D_WEATHER_VIG.get(path=('department', '57', 'vig_level')),
+                            risk_id_l=Tags.D_WEATHER_VIG.get(path=('department', '57', 'risk_id')))
+        self.tl_vig_88.load(level=Tags.D_WEATHER_VIG.get(path=('department', '88', 'vig_level')),
+                            risk_id_l=Tags.D_WEATHER_VIG.get(path=('department', '88', 'risk_id')))
+        self.tl_vig_67.load(level=Tags.D_WEATHER_VIG.get(path=('department', '67', 'vig_level')),
+                            risk_id_l=Tags.D_WEATHER_VIG.get(path=('department', '67', 'risk_id')))
         # flyspray
-        self.tl_fly.load(Tags.L_FLYSPRAY_RSS.get())
+        self.tl_fly.load(task_l=Tags.L_FLYSPRAY_RSS.get())
 
 
 # main
