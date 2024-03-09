@@ -450,8 +450,8 @@ class AirQualityTile(Tile):
         self._level = 0
         self._level_str = tk.StringVar()
         self._status_str = tk.StringVar()
-        self._level_str.set('N/A')
-        self._status_str.set('N/A')
+        self._level_str.set('n/a')
+        self._status_str.set('n/a')
         # tk job
         tk.Label(self, text=city, font='bold', fg=Colors.TXT).pack()
         tk.Label(self).pack()
@@ -473,10 +473,10 @@ class AirQualityTile(Tile):
         try:
             self._level_str.set('%d/6' % self._level)
             self._status_str.set(AirQualityTile.QUALITY_LVL[self._level])
-        except (TypeError, ZeroDivisionError):
+        except (IndexError, TypeError):
             # set tk var
-            self._level_str.set('N/A')
-            self._status_str.set('N/A')
+            self._level_str.set('n/a')
+            self._status_str.set('n/a')
             # choose tile color
             tile_color = Colors.NA
         else:
@@ -725,7 +725,7 @@ class GaugeTile(Tile):
         except (TypeError, ZeroDivisionError):
             self._set_arrow(0.0)
             self.can.configure(bg=Colors.NA)
-            self._str_title.set('%s (%s)' % (self.title, 'N/A'))
+            self._str_title.set('%s (%s)' % (self.title, 'n/a'))
 
     def _set_arrow(self, ratio: float):
         # normalize ratio : 0.2 to 0.8
