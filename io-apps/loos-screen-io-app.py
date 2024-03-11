@@ -11,36 +11,44 @@ from lib.dashboard_io import catch_log_except, wait_uptime
 
 # some class
 class IiyamaFrame:
-    def __init__(self, raw: bytes = b''):
+    def __init__(self):
         # public
-        self.raw = raw
+        self.raw = b''
 
     def __str__(self) -> str:
         return hexlify(self.raw, sep='-').decode()
 
-    @property
-    def with_csum(self) -> bytes:
-        csum = 0
-        for b in self.raw[:-1]:
-            csum ^= b
-        return self.raw + bytes([csum])
+    def __repr__(self) -> str:
+        return self.__str__()
 
-    @property
-    def without_csum(self) -> bytes:
-        return self.raw[:-1]
+    def create(self, frame: bytes) -> "IiyamaFrame":
+        self.raw = frame + bytes([self.get_csum(frame)])
+        return self
+
+    def load(self, frame: bytes) -> "IiyamaFrame":
+        self.raw = frame
+        return self
+
+    @staticmethod
+    def get_csum(data: bytes) -> int:
+        csum = 0
+        for b in data:
+            csum ^= b
+        return csum
 
     @property
     def is_valid(self):
         try:
-            csum = 0
-            for b in self.without_csum:
-                csum ^= b
-            return csum == self.raw[-1]
+            return self.get_csum(self.raw[:-1]) == self.csum
         except IndexError:
             return False
 
     @property
-    def header_id(self):
+    def is_command(self):
+        return self.raw[0] == 0xa6
+
+    @property
+    def header(self):
         return self.raw[0]
 
     @property
@@ -49,28 +57,61 @@ class IiyamaFrame:
 
     @property
     def category(self):
-        return self.raw[2]
+        try:
+            return self.raw[2]
+        except IndexError:
+            return
 
     @property
     def code_0(self):
-        return self.raw[3]
+        try:
+            return self.raw[3]
+        except IndexError:
+            return
 
     @property
     def code_1(self):
-        return self.raw[4]
+        try:
+            if self.is_command:
+                return self.raw[4]
+            else:
+                return
+        except IndexError:
+            return
 
     @property
     def length(self):
-        return self.raw[5]
+        try:
+            if self.is_command:
+                return self.raw[5]
+            else:
+                return self.raw[4]
+        except IndexError:
+            return
 
     @property
     def data_control(self):
-        return self.raw[6]
+        try:
+            if self.is_command:
+                return self.raw[6]
+            else:
+                return self.raw[5]
+        except IndexError:
+            return
 
     @property
     def data_body(self):
-        data_body_len = self.length - 3
-        return self.raw[7:7+data_body_len]
+        try:
+            if self.is_command:
+                return self.raw[7:7+self.length-2]
+            else:
+                return self.raw[6:6+self.length-2]
+        except IndexError:
+            return
+
+    @property
+    def csum(self) -> int:
+        return self.raw[-1]
 
 
 class CustomSerial(Serial):
@@ -89,44 +130,47 @@ class CustomSerial(Serial):
         # init a new request
         self.reset_input_buffer()
         # send frame request
-        serial_port.write(frame.with_csum)
+        serial_port.write(frame.raw)
         # wait response (return when timeout occur)
-        return IiyamaFrame(serial_port.read(255))
+        return IiyamaFrame().load(serial_port.read(255))
 
 
 @catch_log_except()
 def screen_op_hours_job():
-    logging.debug(f'request screen operation time in hours')
-    tx_frame = IiyamaFrame(b'\xa6\x01\x00\x00\x00\x04\x01\x0F\x02')
+    logging.info(f'request screen operation time in hours')
+    tx_frame = IiyamaFrame().create(b'\xa6\x01\x00\x00\x00\x04\x01\x0F\x02')
     rx_frame = serial_port.iiyama_request(tx_frame)
     if rx_frame.is_valid:
         logging.debug(f'read success (return: "{rx_frame}")')
-        op_hours = int.from_bytes(rx_frame.data_body[1:3])
-        logging.info(f'screen operating hours = {op_hours}h')
+        try:
+            op_hours = int.from_bytes(rx_frame.data_body[1:], byteorder='big')
+            logging.info(f'screen operating hours = {op_hours}h')
+        except TypeError:
+            logging.warning(f'unable to decode op hours part in rx frame :"{rx_frame}"')
     else:
         logging.debug('error of checksum in receive frame')
 
 
 @catch_log_except()
 def screen_turn_on_job():
-    logging.debug(f'request to set screen power on')
-    tx_frame = IiyamaFrame(b'\xa6\x01\x00\x00\x00\x04\x01\x18\x02')
+    logging.info(f'request to power on screen')
+    tx_frame = IiyamaFrame().create(b'\xa6\x01\x00\x00\x00\x04\x01\x18\x02')
     rx_frame = serial_port.iiyama_request(tx_frame)
     if rx_frame.is_valid:
-        logging.debug(f'set success (return: "{rx_frame}")')
+        logging.info('success')
     else:
-        logging.debug('error of checksum in receive frame')
+        logging.info('error of checksum in receive frame')
 
 
 @catch_log_except()
 def screen_turn_off_job():
-    logging.debug(f'request to set screen power off')
-    tx_frame = IiyamaFrame(b'\xa6\x01\x00\x00\x00\x04\x01\x18\x01')
+    logging.info(f'request to power off screen')
+    tx_frame = IiyamaFrame().create(b'\xa6\x01\x00\x00\x00\x04\x01\x18\x01')
     rx_frame = serial_port.iiyama_request(tx_frame)
     if rx_frame.is_valid:
-        logging.debug(f'set success (return: "{rx_frame}")')
+        logging.info('success')
     else:
-        logging.debug('error of checksum in receive frame')
+        logging.info('error of checksum in receive frame')
 
 
 # main
@@ -137,7 +181,9 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--baudrate', type=int, default=9600, help='serial rate (default is 9600)')
     parser.add_argument('-p', '--parity', type=str, default='N', help='serial parity (default is "N")')
     parser.add_argument('-s', '--stop', type=float, default=1, help='serial stop bits (default is 1)')
-    parser.add_argument('-t', '--timeout', type=float, default=1.0, help='timeout delay (default is 1.0 s)')
+    parser.add_argument('-t', '--timeout', type=float, default=0.5, help='timeout delay (default is 0.5 s)')
+    parser.add_argument('--turn-on', action='store_true', help='turn on the screen immediately and exit')
+    parser.add_argument('--turn-off', action='store_true', help='turn off the screen immediately and exit')
     parser.add_argument('-d', '--debug', action='store_true', help='set debug mode')
     args = parser.parse_args()
     # logging setup
@@ -153,20 +199,29 @@ if __name__ == '__main__':
         serial_port = CustomSerial(port=args.device, baudrate=args.baudrate, parity=args.parity, bytesize=8,
                                    stopbits=args.stop, timeout=args.timeout)
 
+        # immediate tasks
+        if args.turn_on:
+            screen_turn_on_job()
+            exit(0)
+        if args.turn_off:
+            screen_turn_off_job()
+            exit(0)
+
         # init scheduler
         schedule.every().hours.do(screen_op_hours_job)
-        schedule.every().monday.at('06:00').do(screen_turn_on_job)
+        schedule.every().monday.at('07:00').do(screen_turn_on_job)
         schedule.every().monday.at('19:00').do(screen_turn_off_job)
-        schedule.every().tuesday.at('06:00').do(screen_turn_on_job)
+        schedule.every().tuesday.at('07:00').do(screen_turn_on_job)
         schedule.every().tuesday.at('19:00').do(screen_turn_off_job)
-        schedule.every().wednesday.at('06:00').do(screen_turn_on_job)
+        schedule.every().wednesday.at('07:00').do(screen_turn_on_job)
         schedule.every().wednesday.at('19:00').do(screen_turn_off_job)
-        schedule.every().thursday.at('06:00').do(screen_turn_on_job)
+        schedule.every().thursday.at('07:00').do(screen_turn_on_job)
         schedule.every().thursday.at('19:00').do(screen_turn_off_job)
-        schedule.every().friday.at('06:00').do(screen_turn_on_job)
+        schedule.every().friday.at('07:00').do(screen_turn_on_job)
         schedule.every().friday.at('19:00').do(screen_turn_off_job)
 
-        # first call
+        # startup call
+        screen_turn_on_job()
         screen_op_hours_job()
 
         # main loop
