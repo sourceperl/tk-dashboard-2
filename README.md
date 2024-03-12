@@ -23,9 +23,9 @@ sudo ufw enable
 ### Global
 
 ```bash
-sudo mkdir /opt/tk-dashboard
-sudo mkdir /opt/tk-dashboard/ui-apps
-sudo mkdir /opt/tk-dashboard/io-apps
+sudo mkdir -p /opt/tk-dashboard/ui-apps
+sudo mkdir -p /opt/tk-dashboard/io-apps
+sudo mkdir -p /opt/tk-dashboard/virtualenvs
 ```
 
 ### Loos UI (user interface)
@@ -40,32 +40,19 @@ sudo cp -rv  ui-apps/loos-ui-app.py /opt/tk-dashboard/ui-apps/
 ### Loos IO (input/output)
 
 ```bash
-## loos-export-io
+# init python venv
+sudo cp -rv  virtualenvs/loos /opt/tk-dashboard/virtualenvs/
+sudo /opt/tk-dashboard/virtualenvs/loos/loos-venv-setup.sh
+
 # copy
 sudo cp -rv  io-apps/conf /opt/tk-dashboard/io-apps/
 sudo cp -rv  io-apps/lib /opt/tk-dashboard/io-apps/
 sudo cp -rv  io-apps/loos-* /opt/tk-dashboard/io-apps/
-# init python venv
-sudo /opt/tk-dashboard/io-apps/loos-venv-setup.sh
-
-## loos-import-io
-# copy
-sudo cp -rv --dereference io-apps/loos-import-io /opt/tk-dashboard/
-# init python venv
-sudo /opt/tk-dashboard/loos-import-io/venv_setup.sh
-
-## loos-meters-io
-# copy
-sudo cp -rv --dereference io-apps/loos-meters-io /opt/tk-dashboard/
-# init python venv
-sudo /opt/tk-dashboard/loos-meters-io/venv_setup.sh
 
 ## for all
 echo 'think to populate private_data.py with credentials, URLs...'
 echo 'start with cp example_private_data.py private_data.py'
 ```
-
-### Supervisor
 
 ```bash
 # supervisor setup
@@ -85,9 +72,10 @@ sudo supervisorctl update
 # ...
 ```
 
-### HOWTOs
 
-#### SSL/TLS
+## HOWTOs
+
+### SSL/TLS
 
 ```bash
 # create private key and self-signed certificate for server
@@ -97,5 +85,3 @@ sudo openssl req -x509 -newkey rsa:4096 -days 3650 -nodes \
                  -keyout ${target_prefix}.key \
                  -out ${target_prefix}.crt
 ```
-
-
