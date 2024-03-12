@@ -132,7 +132,7 @@ class CustomRedis(redis.Redis):
         return super().execute_command(*args, **options)
 
     @catch_log_except(catch=redis.RedisError, log_lvl=LOG_LEVEL)
-    def publish(self, channel: str | bytes, message: str | bytes, **kwargs: Any) -> int:
+    def publish(self, channel: Union[str, bytes], message: Union[str, bytes], **kwargs: Any) -> int:
         return super().publish(channel, message, **kwargs)
 
     @catch_log_except(catch=(redis.RedisError, AttributeError, json.decoder.JSONDecodeError), log_lvl=LOG_LEVEL)

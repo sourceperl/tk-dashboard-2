@@ -4,6 +4,7 @@ import argparse
 from binascii import hexlify
 import time
 import logging
+from typing import Union
 from serial import Serial, serialutil
 import schedule
 from lib.dashboard_io import catch_log_except, wait_uptime
@@ -121,7 +122,7 @@ class CustomSerial(Serial):
         logging.debug(f'dump app <- serial: "{r_dump}"')
         return r_value
 
-    def write(self, data: bytes) -> int | None:
+    def write(self, data: bytes) -> Union[int, None]:
         w_dump = hexlify(data, sep='-').decode().upper()
         logging.debug(f'dump app -> serial: "{w_dump}"')
         return super().write(data)
