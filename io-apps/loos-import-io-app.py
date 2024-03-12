@@ -22,8 +22,8 @@ import PIL.Image
 import PIL.ImageDraw
 from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local, wait_uptime
 from lib.webdav import WebDAV
-from conf.private_loos import REDIS_USER, REDIS_PASS, DWEET_THING, DWEET_KEY, GMAP_IMG_URL, GSHEET_URL, OW_APP_ID, \
-    VIGILANCE_KEY, WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
+from conf.private_loos import REDIS_USER, REDIS_PASS, DWEET_THING, DWEET_KEY, GMAP_IMG_URL, CAM_GATE_IMG_URL, CAM_DOOR_1_IMG_URL, CAM_DOOR_2_IMG_URL, \
+    GSHEET_URL, OW_APP_ID, VIGILANCE_KEY, WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
 
 
 # some const
@@ -142,11 +142,57 @@ def img_gmap_traffic_job():
     pil_img = PIL.Image.open(io.BytesIO(uo_ret.read()))
     # crop image
     pil_img = pil_img.crop((0, 0, 560, 328))
-    # pil_img.thumbnail([632, 328])
+    # png encode
     img_io = io.BytesIO()
     pil_img.save(img_io, format='PNG')
     # store RAW PNG to redis key
     DB.main.set('img:traffic-map:png', img_io.getvalue(), ex=2*3600)
+
+
+@catch_log_except()
+def img_cam_gate_job():
+    # http request
+    uo_ret = urlopen(CAM_GATE_IMG_URL, timeout=5.0)
+    # convert RAW img format (bytes) to Pillow image
+    pil_img = PIL.Image.open(io.BytesIO(uo_ret.read()))
+    # transform image
+    pil_img = pil_img.crop((0, 0, 640, 440))
+    pil_img.thumbnail([339, 228])
+    # jpeg encode
+    img_io = io.BytesIO()
+    pil_img.save(img_io, format='JPEG')
+    # store RAW jpeg to redis key
+    DB.main.set('img:cam-gate:jpg', img_io.getvalue(), ex=120)
+
+
+@catch_log_except()
+def img_cam_door_1_job():
+    # http request
+    uo_ret = urlopen(CAM_DOOR_1_IMG_URL, timeout=5.0)
+    # convert RAW img format (bytes) to Pillow image
+    pil_img = PIL.Image.open(io.BytesIO(uo_ret.read()))
+    # transform image
+    pil_img = pil_img.crop((720, 0, 1200, 480))
+    pil_img.thumbnail([339, 228])
+    img_io = io.BytesIO()
+    pil_img.save(img_io, format='JPEG')
+    # store RAW jpeg to redis key
+    DB.main.set('img:cam-door-1:jpg', img_io.getvalue(), ex=120)
+
+
+@catch_log_except()
+def img_cam_door_2_job():
+    # http request
+    uo_ret = urlopen(CAM_DOOR_2_IMG_URL, timeout=5.0)
+    # convert RAW img format (bytes) to Pillow image
+    pil_img = PIL.Image.open(io.BytesIO(uo_ret.read()))
+    # transform image
+    pil_img = pil_img.crop((640, 0, 1280, 440))
+    pil_img.thumbnail([339, 228])
+    img_io = io.BytesIO()
+    pil_img.save(img_io, format='JPEG')
+    # store RAW jpeg to redis key
+    DB.main.set('img:cam-door-2:jpg', img_io.getvalue(), ex=120)
 
 
 @catch_log_except()
@@ -420,10 +466,10 @@ def vigilance_job():
     since_update = datetime.now().astimezone(tz=timezone.utc) - js_update_dt
     # skip outdated json (24h old)
     if since_update.total_seconds() > 24 * 3600:
-        raise RuntimeError(f'json message outdated (update="{js_update_iso_str}")')    
+        raise RuntimeError(f'json message outdated (update="{js_update_iso_str}")')
     # init a dict for publication
     vig_d = {'update': js_update_iso_str, 'department': {}}
-    # parse data structure    
+    # parse data structure
     for period_d in vig_raw_d['product']['periods']:
         # keep only J echeance, ignore J1
         if period_d['echeance'] == 'J':
@@ -435,7 +481,7 @@ def vigilance_job():
                 risk_id_l = []
                 for ph_item_d in domain_id_d['phenomenon_items']:
                     # ignore risks at green vig level
-                    if max_color_id > 1 :
+                    if max_color_id > 1:
                         # keep only risk_id if greater or equal of current level
                         if ph_item_d['phenomenon_max_color_id'] >= max_color_id:
                             risk_id_l.append(int(ph_item_d['phenomenon_id']))
@@ -500,7 +546,7 @@ if __name__ == '__main__':
     wdv_ssl_ctx.check_hostname = False
     wdv_ssl_ctx.verify_mode = ssl.CERT_NONE
     # TODO replace above SSL context by self-signed server cert
-    #wdv_ssl_ctx.load_verify_locations('conf/cert/my-srv-cert.pem')
+    # wdv_ssl_ctx.load_verify_locations('conf/cert/my-srv-cert.pem')
     wdv = WebDAV(WEBDAV_URL, username=WEBDAV_USER, password=WEBDAV_PASS, ssl_ctx=wdv_ssl_ctx)
 
     # init scheduler
@@ -511,11 +557,14 @@ if __name__ == '__main__':
     schedule.every(5).minutes.do(dweet_job)
     schedule.every(5).minutes.do(gsheet_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
+    schedule.every(2).seconds.do(img_cam_gate_job)
+    schedule.every(2).seconds.do(img_cam_door_1_job)
+    schedule.every(2).seconds.do(img_cam_door_2_job)
     schedule.every(5).minutes.do(local_info_job)
     schedule.every(15).minutes.do(openweathermap_forecast_job)
     schedule.every(5).minutes.do(vigilance_job)
     schedule.every(5).minutes.do(weather_today_job)
-    
+
     # wait system ready (uptime > 25s)
     wait_uptime(min_s=25.0)
 

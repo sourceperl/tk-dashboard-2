@@ -223,6 +223,7 @@ if __name__ == '__main__':
 
         # startup call
         screen_turn_on_job()
+        time.sleep(5)
         screen_op_hours_job()
 
         # main loop

@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from lib.dashboard_ui import \
     AsyncTask, CustomRedis, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
-    AirQualityTile, ClockTile, DaysAccTileLoos, EmptyTile, GaugeTile, NewsBannerTile, \
+    AirQualityTile, ClockTile, DaysAccTileLoos, GaugeTile, NewsBannerTile, \
     FlysprayTile, ImageRawTile, ImageRawCarouselTile, VigilanceTile, WattsTile, WeatherTile
 from conf.private_loos import REDIS_USER, REDIS_PASS
 
@@ -36,6 +36,9 @@ class Tags(TagsBase):
     IMG_ATMO_HDF = Tag(read=lambda: DB.main.get('img:static:logo-atmo-hdf:png'), io_every=10.0)
     IMG_LOGO_GRT = Tag(read=lambda: DB.main.get('img:static:logo-grt:png'), io_every=10.0)
     IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
+    IMG_CAM_GATE = Tag(read=lambda: DB.main.get('img:cam-gate:jpg'), io_every=2.0)
+    IMG_CAM_DOOR_1 = Tag(read=lambda: DB.main.get('img:cam-door-1:jpg'), io_every=2.0)
+    IMG_CAM_DOOR_2 = Tag(read=lambda: DB.main.get('img:cam-door-2:jpg'), io_every=2.0)
     DIR_CAROUSEL_RAW = Tag(read=lambda: DB.main.hgetall('dir:carousel:raw:min-png'), io_every=10.0)
     PDF_FILENAMES_L = Tag(read=lambda: map(bytes.decode, DB.main.hkeys('dir:doc:raw')))
     PDF_CONTENT = Tag(read=lambda file: DB.main.hget('dir:doc:raw', file))
@@ -124,10 +127,16 @@ class LiveTilesTab(TilesTab):
         # clock
         self.tl_clock = ClockTile(self)
         self.tl_clock.set_tile(row=0, column=5, rowspan=2, columnspan=3)
-        # empty area(s)
-        self.tl_empty = EmptyTile(self)
-        self.tl_empty.set_tile(row=2, column=5, rowspan=2, columnspan=8)
-        self.tl_empty.add_on_click_cmd(self._on_click_empty_tile)
+        # loos gate cam
+        self.tl_cam_gate = ImageRawTile(self)
+        self.tl_cam_gate.set_tile(row=2, column=5, rowspan=2, columnspan=3)
+        self.tl_cam_gate.add_on_click_cmd(self._on_click_cam_gate_tile)
+        # loos door 1 cam
+        self.tl_cam_door_1 = ImageRawTile(self)
+        self.tl_cam_door_1.set_tile(row=2, column=8, rowspan=2, columnspan=2)
+        # loos door 1 cam
+        self.tl_cam_door_2 = ImageRawTile(self)
+        self.tl_cam_door_2.set_tile(row=2, column=10, rowspan=2, columnspan=3)
         # news banner
         self.tl_news = NewsBannerTile(self)
         self.tl_news.set_tile(row=8, column=0, columnspan=17)
@@ -197,8 +206,10 @@ class LiveTilesTab(TilesTab):
         self.tl_atmo_maub.load(level=Tags.D_ATMO_QUALITY.get(path='maubeuge'))
         # air Saint-Quentin
         self.tl_atmo_sque.load(level=Tags.D_ATMO_QUALITY.get(path='saint-quentin'))
-        # update news widget
-        self.tl_news.load(titles_l=Tags.D_NEWS_LOCAL.get())
+        # cams
+        self.tl_cam_gate.load(Tags.IMG_CAM_GATE.get())
+        self.tl_cam_door_1.load(Tags.IMG_CAM_DOOR_1.get())
+        self.tl_cam_door_2.load(Tags.IMG_CAM_DOOR_2.get())
         # gauges update
         self.tl_g_veh.load(percent=Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_JAUGE_DTS')),
                            head_str='%s/%s' % (Tags.D_GSHEET_GRT.get(path=('tags', 'IGP_VEH_REAL_DTS')),
@@ -235,8 +246,10 @@ class LiveTilesTab(TilesTab):
                            yesterday_wh=Tags.MET_YESTERDAY_WH.get())
         # flyspray
         self.tl_fly.load(task_l=Tags.L_FLYSPRAY_RSS.get())
+        # update news widget
+        self.tl_news.load(titles_l=Tags.D_NEWS_LOCAL.get())
 
-    def _on_click_empty_tile(self):
+    def _on_click_cam_gate_tile(self):
         AsyncTasks.redis_foo_pub.send('click on empty tile')
 
 

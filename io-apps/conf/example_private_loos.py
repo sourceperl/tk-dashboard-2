@@ -6,6 +6,10 @@ DWEET_THING = ''
 DWEET_KEY = ''
 # gmap
 GMAP_IMG_URL = ''
+# cams
+CAM_GATE_IMG_URL = ''
+CAM_DOOR_1_IMG_URL = ''
+CAM_DOOR_2_IMG_URL = ''
 # gsheet
 GSHEET_URL= ''
 # openweathermap
