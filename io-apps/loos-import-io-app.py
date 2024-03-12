@@ -11,6 +11,7 @@ import ssl
 import time
 from urllib.request import Request, urlopen
 import zlib
+import dateutil.parser
 from cryptography.fernet import Fernet, InvalidToken
 import feedparser
 import schedule
@@ -415,7 +416,7 @@ def vigilance_job():
     vig_raw_d = json.load(uo_ret)
     # check header
     js_update_iso_str = vig_raw_d['product']['update_time']
-    js_update_dt = datetime.fromisoformat(js_update_iso_str)
+    js_update_dt = dateutil.parser.parse(js_update_iso_str)
     since_update = datetime.now().astimezone(tz=timezone.utc) - js_update_dt
     # skip outdated json (24h old)
     if since_update.total_seconds() > 24 * 3600:
