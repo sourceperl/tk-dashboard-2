@@ -9,12 +9,13 @@ from lib.dashboard_ui import \
     AsyncTask, CustomRedis, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
     AirQualityTile, ClockTile, DaysAccTileLoos, GaugeTile, NewsBannerTile, \
     FlysprayTile, ImageRawTile, ImageRawCarouselTile, VigilanceTile, WattsTile, WeatherTile
-from conf.private_loos import REDIS_USER, REDIS_PASS
+from conf.private_loos import REDIS_USER, REDIS_PASS, REM_REDIS_HOST, REM_REDIS_PORT, REM_REDIS_USER, REM_REDIS_PASS
 
 
 class DB:
-    # create connector
     main = CustomRedis(host='localhost', username=REDIS_USER, password=REDIS_PASS,
+                       socket_timeout=4, socket_keepalive=True)
+    remote = CustomRedis(host=REM_REDIS_HOST, port=REM_REDIS_PORT , username=REM_REDIS_USER, password=REM_REDIS_PASS,
                        socket_timeout=4, socket_keepalive=True)
 
 
@@ -44,13 +45,14 @@ class Tags(TagsBase):
     PDF_CONTENT = Tag(read=lambda file: DB.main.hget('dir:doc:raw', file))
 
 
-class RedisFooPubTask(AsyncTask):
-    def process(self, item: Any):
-        DB.main.publish(channel='foo', message=str(item))
+class RemRedisActionsTask(AsyncTask):
+    def do(self, item: Any):
+        logging.info(f'request "{item}" action')
+        DB.remote.publish(channel='pub_action', message=item)
 
 
 class AsyncTasks:
-    redis_foo_pub = RedisFooPubTask(max_items=3)
+    rem_redis_actions = RemRedisActionsTask(max_items=3)
 
 
 class MainApp(tk.Tk):
@@ -130,13 +132,15 @@ class LiveTilesTab(TilesTab):
         # loos gate cam
         self.tl_cam_gate = ImageRawTile(self)
         self.tl_cam_gate.set_tile(row=2, column=5, rowspan=2, columnspan=3)
-        self.tl_cam_gate.add_on_click_cmd(self._on_click_cam_gate_tile)
+        self.tl_cam_gate.add_on_click_cmd(self._on_click_gate_tile)
         # loos door 1 cam
         self.tl_cam_door_1 = ImageRawTile(self)
         self.tl_cam_door_1.set_tile(row=2, column=8, rowspan=2, columnspan=2)
-        # loos door 1 cam
+        self.tl_cam_door_1.add_on_click_cmd(self._on_click_door_1_tile)
+        # loos door 2 cam
         self.tl_cam_door_2 = ImageRawTile(self)
         self.tl_cam_door_2.set_tile(row=2, column=10, rowspan=2, columnspan=3)
+        self.tl_cam_door_2.add_on_click_cmd(self._on_click_door_2_tile)
         # news banner
         self.tl_news = NewsBannerTile(self)
         self.tl_news.set_tile(row=8, column=0, columnspan=17)
@@ -249,8 +253,14 @@ class LiveTilesTab(TilesTab):
         # update news widget
         self.tl_news.load(titles_l=Tags.D_NEWS_LOCAL.get())
 
-    def _on_click_cam_gate_tile(self):
-        AsyncTasks.redis_foo_pub.send('click on empty tile')
+    def _on_click_gate_tile(self):
+        AsyncTasks.rem_redis_actions.add(item='open-car')
+
+    def _on_click_door_1_tile(self):
+        AsyncTasks.rem_redis_actions.add(item='open-hall')
+
+    def _on_click_door_2_tile(self):
+        AsyncTasks.rem_redis_actions.add(item='open-delivery')
 
 
 # main

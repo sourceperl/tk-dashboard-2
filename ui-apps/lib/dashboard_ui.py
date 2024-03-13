@@ -108,16 +108,16 @@ class AsyncTask:
         while True:
             try:
                 item = self._queue.get()
-                self.process(item)
+                self.do(item)
             except Exception as e:
                 logging.warning(f'except {type(e).__name__} in {type(self).__name__}: {e}')
             finally:
                 self._queue.task_done()
 
-    def process(self, item: Any) -> None:
+    def do(self, item: Any) -> None:
         raise NotImplemented
 
-    def send(self, item: Any) -> None:
+    def add(self, item: Any) -> None:
         try:
             self._queue.put_nowait(item)
         except queue.Full:
