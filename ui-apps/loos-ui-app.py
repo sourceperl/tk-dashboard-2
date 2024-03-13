@@ -48,7 +48,7 @@ class Tags(TagsBase):
 class RemRedisActionsTask(AsyncTask):
     def do(self, item: Any):
         logging.info(f'request "{item}" action')
-        DB.remote.publish(channel='pub_action', message=item)
+        DB.remote.publish(channel='pub:actions', message=item)
 
 
 class AsyncTasks:
