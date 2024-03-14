@@ -1,6 +1,6 @@
-#!/opt/tk-dashboard/io-apps/venv/bin/python
+#!/opt/tk-dashboard/virtualenvs/wam/venv/bin/python
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import io
 import json
 import logging
@@ -77,11 +77,11 @@ def air_quality_atmo_hdf_job():
 def ble_sensor_job():
     ble_data_d = {}
     # add outdoor ble data
-    ble_out_d = DB.hall.get_from_json('ble-data-js:outdoor')
+    ble_out_d = DB.hall.get_from_json('ble-js:outdoor')
     if ble_out_d:
         ble_data_d['outdoor'] = {'temp_c': ble_out_d.get('temp_c'), 'hum_p': ble_out_d.get('hum_p')}
     # add kitchen ble data
-    ble_kit_d = DB.hall.get_from_json('ble-data-js:kitchen')
+    ble_kit_d = DB.hall.get_from_json('ble-js:kitchen')
     if ble_kit_d:
         ble_data_d['kitchen'] = {'temp_c': ble_kit_d.get('temp_c'), 'hum_p': ble_kit_d.get('hum_p')}
     # publish
