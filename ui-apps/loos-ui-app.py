@@ -15,8 +15,8 @@ from conf.private_loos import REDIS_USER, REDIS_PASS, REM_REDIS_HOST, REM_REDIS_
 class DB:
     main = CustomRedis(host='localhost', username=REDIS_USER, password=REDIS_PASS,
                        socket_timeout=4, socket_keepalive=True)
-    remote = CustomRedis(host=REM_REDIS_HOST, port=REM_REDIS_PORT , username=REM_REDIS_USER, password=REM_REDIS_PASS,
-                       socket_timeout=4, socket_keepalive=True)
+    remote = CustomRedis(host=REM_REDIS_HOST, port=REM_REDIS_PORT, username=REM_REDIS_USER, password=REM_REDIS_PASS,
+                         socket_timeout=4, socket_keepalive=True)
 
 
 class Tags(TagsBase):
