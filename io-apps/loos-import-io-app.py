@@ -197,9 +197,12 @@ def img_cam_door_2_job():
 
 @catch_log_except()
 def local_info_job():
-    # do request
+    # http request
+    rss_url = 'https://france3-regions.francetvinfo.fr/societe/rss?r=hauts-de-france'
+    uo_ret = urlopen(rss_url, timeout=5.0)
+    # parse RSS
     l_titles = []
-    for post in feedparser.parse('https://france3-regions.francetvinfo.fr/societe/rss?r=hauts-de-france').entries:
+    for post in feedparser.parse(uo_ret.read()).entries:
         title = post.title
         title = title.strip()
         title = title.replace('\n', ' ')
