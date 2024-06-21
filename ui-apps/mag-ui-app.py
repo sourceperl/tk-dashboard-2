@@ -4,8 +4,8 @@ import argparse
 import logging
 from typing import Any
 import tkinter as tk
-from tkinter import ttk
-from lib.dashboard_ui import AsyncTask, Colors, CustomRedis, ImageRawTile, TilesTab, Tag, TagsBase, Tile, wait_uptime
+from lib.dashboard_ui import AsyncTask, Colors, CustomRedis, ClockTile, ImageRawTile, TilesTab, Tag, TagsBase, Tile, \
+    wait_uptime
 from conf.private_mag import REDIS_USER, REDIS_PASS, REM_REDIS_HOST, REM_REDIS_PORT, REM_REDIS_USER, REM_REDIS_PASS
 
 
@@ -58,20 +58,11 @@ class MainApp(tk.Tk):
         # remove mouse icon in touchscreen mode (default)
         if not app_conf.cursor:
             self.config(cursor='none')
-        # define style to fix size of tab header
-        self.style = ttk.Style()
-        self.style.theme_settings('default', {'TNotebook.Tab': {'configure': {'padding': [8, 8]}}})
-        # define notebook
-        self.note = ttk.Notebook(self)
-        self.tab1 = LiveTilesTab(self.note, tiles_size=(8, 4))
-        self.note.add(self.tab1, text='Tableau de bord')
-        self.note.pack()
-        # default tab
-        self.note.select(self.tab1)
+        # add LiveTilesTab to Tk app
+        self.live_tab = LiveTilesTab(self, tiles_size=(8, 4))
+        self.live_tab.pack()
         # press Esc to quit
         self.bind('<Escape>', lambda evt: self.destroy())
-        # bind function keys to tabs
-        self.bind('<F1>', lambda evt: self.note.select(self.tab1))
         # add an user idle timer (timeout set to 15mn)
         self.user_idle_timeout_s = 15*60
         # init idle timer
@@ -109,6 +100,9 @@ class LiveTilesTab(TilesTab):
         self.tl_cam_door_2 = ImageRawTile(self)
         self.tl_cam_door_2.set_tile(row=0, column=5, rowspan=2, columnspan=3)
         self.tl_cam_door_2.add_on_click_cmd(self._on_click_door_2_tile)
+        # clock tile
+        self.tl_clock = ClockTile(self)
+        self.tl_clock.set_tile(row=2, column=0, rowspan=2, columnspan=8)
         # start auto-update
         self.init_cyclic_update(every_ms=5_000)
         # at startup:

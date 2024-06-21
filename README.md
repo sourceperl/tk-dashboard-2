@@ -12,7 +12,7 @@ sudo apt install -y redis supervisor stunnel4 fail2ban ufw xpdf fonts-freefont-t
 sudo apt install -y python3-redis python3-pil python3-pil.imagetk
 ```
 
-### Firewall 
+### Firewall
 
 ```bash
 # UFW firewall setup
@@ -41,13 +41,47 @@ sudo cp -rv  ui-apps/loos-ui-app.py /opt/tk-dashboard/ui-apps/
 
 ```bash
 # init python venv
-sudo cp -rv  virtualenvs/loos /opt/tk-dashboard/virtualenvs/
+sudo cp -rv virtualenvs/loos /opt/tk-dashboard/virtualenvs/
 sudo /opt/tk-dashboard/virtualenvs/loos/loos-venv-setup.sh
 
 # copy
-sudo cp -rv  io-apps/conf /opt/tk-dashboard/io-apps/
-sudo cp -rv  io-apps/lib /opt/tk-dashboard/io-apps/
-sudo cp -rv  io-apps/loos-* /opt/tk-dashboard/io-apps/
+sudo cp -rv io-apps/conf /opt/tk-dashboard/io-apps/
+sudo cp -rv io-apps/lib /opt/tk-dashboard/io-apps/
+sudo cp -rv io-apps/loos-* /opt/tk-dashboard/io-apps/
+
+## for all
+echo 'think to populate private_data.py with credentials, URLs...'
+echo 'start with cp example_private_data.py private_data.py'
+```
+
+```bash
+# supervisor setup
+sudo cp supervisor/tk-dashboard-loos.conf /etc/supervisor/conf.d/
+sudo supervisorctl update
+```
+
+### Mag UI (user interface)
+
+```bash
+# copy
+sudo mkdir -pv /opt/tk-dashboard/ui-apps/conf
+sudo cp -v ui-apps/conf/example_private_mag.py /opt/tk-dashboard/ui-apps/conf/
+sudo cp -rv ui-apps/lib /opt/tk-dashboard/ui-apps/
+sudo cp -rv ui-apps/mag-* /opt/tk-dashboard/ui-apps/
+```
+
+### Mag IO (input/output)
+
+```bash
+# init python venv
+sudo cp -rv virtualenvs/mag /opt/tk-dashboard/virtualenvs/
+sudo /opt/tk-dashboard/virtualenvs/mag/mag-venv-setup.sh
+
+# copy
+sudo mkdir -pv /opt/tk-dashboard/io-apps/conf
+sudo cp -v io-apps/conf/example_private_mag.py /opt/tk-dashboard/io-apps/conf/
+sudo cp -rv io-apps/lib /opt/tk-dashboard/io-apps/
+sudo cp -v io-apps/mag-import-io-app.py /opt/tk-dashboard/io-apps/
 
 ## for all
 echo 'think to populate private_data.py with credentials, URLs...'
