@@ -8,7 +8,7 @@
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y redis supervisor stunnel4 fail2ban ufw xpdf fonts-freefont-ttf fonts-noto-core 
+sudo apt install -y redis supervisor stunnel4 fail2ban ufw xpdf fonts-freefont-ttf fonts-noto-core
 sudo apt install -y python3-redis python3-pil python3-pil.imagetk
 ```
 
