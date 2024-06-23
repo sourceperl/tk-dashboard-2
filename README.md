@@ -90,7 +90,7 @@ echo 'start with cp example_private_data.py private_data.py'
 
 ```bash
 # supervisor setup
-sudo cp supervisor/tk-dashboard-loos.conf /etc/supervisor/conf.d/
+sudo cp supervisor/tk-dashboard-mag.conf /etc/supervisor/conf.d/
 sudo supervisorctl update
 ```
 
