@@ -81,7 +81,7 @@ sudo /opt/tk-dashboard/virtualenvs/mag/mag-venv-setup.sh
 sudo mkdir -pv /opt/tk-dashboard/io-apps/conf
 sudo cp -v io-apps/conf/example_private_mag.py /opt/tk-dashboard/io-apps/conf/
 sudo cp -rv io-apps/lib /opt/tk-dashboard/io-apps/
-sudo cp -v io-apps/mag-import-io-app.py /opt/tk-dashboard/io-apps/
+sudo cp -v io-apps/mag-* /opt/tk-dashboard/io-apps/
 
 ## for all
 echo 'think to populate private_data.py with credentials, URLs...'
