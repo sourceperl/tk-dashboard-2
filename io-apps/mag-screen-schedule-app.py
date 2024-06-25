@@ -44,7 +44,7 @@ if __name__ == '__main__':
         exit(0)
 
     # init scheduler
-    schedule.every().days.at('06:00').do(set_backlight, value=60)
+    schedule.every().days.at('06:00').do(set_backlight, value=80)
     schedule.every().days.at('20:00').do(set_backlight, value=30)
 
     # main loop

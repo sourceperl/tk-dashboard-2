@@ -78,8 +78,7 @@ class MainApp(tk.Tk):
         self._idle_timer = self.after(self.user_idle_timeout_s * 1000, self.on_user_idle)
 
     def on_user_idle(self):
-        # select first tab
-        self.note.select(self.tab1)
+        pass
 
 
 class LiveTilesTab(TilesTab):
