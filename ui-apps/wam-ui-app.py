@@ -36,8 +36,12 @@ class Tags(TagsBase):
     #        -> tags callbacks (read/write methods) are call by this IO thread (not by tkinter main thread)
     D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
+    BLE_OUTDOOR_BATT_LVL = Tag(read=lambda: DB.main.get_js('json:ble:outdoor:batt_lvl'), io_every=2.0)
     BLE_OUTDOOR_TEMP_C = Tag(read=lambda: DB.main.get_js('json:ble:outdoor:temp_c'), io_every=2.0)
     BLE_OUTDOOR_HUM_P = Tag(read=lambda: DB.main.get_js('json:ble:outdoor:hum_p'), io_every=2.0)
+    BLE_GARAGE_BATT_LVL = Tag(read=lambda: DB.main.get_js('json:ble:garage:batt_lvl'), io_every=2.0)
+    BLE_GARAGE_TEMP_C = Tag(read=lambda: DB.main.get_js('json:ble:garage:temp_c'), io_every=2.0)
+    BLE_GARAGE_HUM_P = Tag(read=lambda: DB.main.get_js('json:ble:garage:hum_p'), io_every=2.0)
     BLE_KITCHEN_TEMP_C = Tag(read=lambda: DB.main.get_js('json:ble:kitchen:temp_c'), io_every=2.0)
     BLE_KITCHEN_HUM_P = Tag(read=lambda: DB.main.get_js('json:ble:kitchen:hum_p'), io_every=2.0)
     METAR_DATA = Tag(read=lambda: DB.main.get_js('json:metar:lesquin'), io_every=2.0)
@@ -126,9 +130,12 @@ class LiveTilesTab(TilesTab):
         # clock
         self.tl_clock = ClockTile(self)
         self.tl_clock.set_tile(row=0, column=5, rowspan=2, columnspan=3)
-        # ext weather
-        self.tl_ext = CustomLabelTile(self)
-        self.tl_ext.set_tile(row=2, column=5, rowspan=1, columnspan=1)
+        # outdoor weather
+        self.tl_out = CustomLabelTile(self)
+        self.tl_out.set_tile(row=2, column=5, rowspan=1, columnspan=1)
+        # garage weather
+        self.tl_gar = CustomLabelTile(self)
+        self.tl_gar.set_tile(row=2, column=6, rowspan=1, columnspan=1)
         # kitchen weather
         self.tl_kit = CustomLabelTile(self)
         self.tl_kit.set_tile(row=2, column=7, rowspan=1, columnspan=1)
@@ -156,13 +163,21 @@ class LiveTilesTab(TilesTab):
         # traffic map
         self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get(), crop=(30, 0, 530, 328))
         # outdoor ble data
+        batt_lvl = fmt_value(Tags.BLE_OUTDOOR_BATT_LVL.get(path='value'), fmt='>6.0f')
         temp_c = fmt_value(Tags.BLE_OUTDOOR_TEMP_C.get(path='value'), fmt='>6.1f')
         hum_p = fmt_value(Tags.BLE_OUTDOOR_HUM_P.get(path='value'), fmt='>6.1f')
-        self.tl_ext.load(txt=f'Extérieur\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
+        self.tl_out.load(txt=f'Extérieur\n\N{ELECTRIC PLUG} {batt_lvl} %\n'
+                             f'  \N{THERMOMETER} {temp_c} °C\n  \N{BLACK DROPLET} {hum_p} %')
+        # garage ble data
+        batt_lvl = fmt_value(Tags.BLE_GARAGE_BATT_LVL.get(path='value'), fmt='>6.0f')
+        temp_c = fmt_value(Tags.BLE_GARAGE_TEMP_C.get(path='value'), fmt='>6.1f')
+        hum_p = fmt_value(Tags.BLE_GARAGE_HUM_P.get(path='value'), fmt='>6.1f')
+        self.tl_gar.load(txt=f'Garage\n\N{ELECTRIC PLUG} {batt_lvl} %\n'
+                             f'  \N{THERMOMETER} {temp_c} °C\n  \N{BLACK DROPLET} {hum_p} %')
         # kitchen ble data
         temp_c = fmt_value(Tags.BLE_KITCHEN_TEMP_C.get(path='value'), fmt='>6.1f')
         hum_p = fmt_value(Tags.BLE_KITCHEN_HUM_P.get(path='value'), fmt='>6.1f')
-        self.tl_kit.load(txt=f'Cuisine\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
+        self.tl_kit.load(txt=f'Cuisine\n\n  \N{THERMOMETER} {temp_c} °C\n  \N{BLACK DROPLET} {hum_p} %')
         # metar data
         update_fr = fmt_value(Tags.METAR_DATA.get(path='update_fr'), fmt='', alt_str='\t')
         press_hpa = fmt_value(Tags.METAR_DATA.get(path='press'), fmt='>5.0f')
@@ -173,10 +188,10 @@ class LiveTilesTab(TilesTab):
         w_gust_kmh = fmt_value(Tags.METAR_DATA.get(path='w_gust'), fmt='>3.0f', alt_str='')
         w_gust_kmh_str = f'(\N{LEAF FLUTTERING IN WIND} {w_gust_kmh} km/h)' if w_gust_kmh else ''
         self.tl_metar.load(txt=f'Lesquin (station Météo-France)\n'
-                           f'{update_fr}\t\N{TIMER CLOCK} {press_hpa} hPa\n'
-                           f'\N{THERMOMETER} {temp_c} °C'
+                           f'  {update_fr}\t\N{TIMER CLOCK} {press_hpa} hPa\n'
+                           f'  \N{THERMOMETER} {temp_c} °C'
                            f'\t\N{WIND BLOWING FACE} {w_speed_kmh} km/h\n'
-                           f'\N{THERMOMETER}\N{BLACK DROPLET} {dewpt_c} °C  '
+                           f'  \N{THERMOMETER}\N{BLACK DROPLET} {dewpt_c} °C  '
                            f'\t\N{WHITE-FEATHERED RIGHTWARDS ARROW}   {w_dir}'
                            f' {w_gust_kmh_str}')
 
