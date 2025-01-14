@@ -6,3 +6,4 @@ pyserial==3.5
 python-dateutil>=2.9.0
 redis==5.0.1
 schedule==1.2.1
+bleak==0.22.3
