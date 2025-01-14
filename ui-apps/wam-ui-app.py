@@ -4,10 +4,23 @@ import argparse
 import logging
 import tkinter as tk
 from tkinter import ttk
-from lib.dashboard_ui import \
-    Colors, CustomRedis, Tag, TagsBase, Tile, TilesTab, fmt_value, wait_uptime, \
-    AirQualityTile, ClockTile, EmptyTile,  ImageRawTile, VigilanceTile
-from conf.private_wam import REDIS_USER, REDIS_PASS
+
+from conf.private_wam import REDIS_PASS, REDIS_USER
+from lib.dashboard_ui import (
+    AirQualityTile,
+    ClockTile,
+    Colors,
+    CustomRedis,
+    EmptyTile,
+    ImageRawTile,
+    Tag,
+    TagsBase,
+    Tile,
+    TilesTab,
+    VigilanceTile,
+    fmt_value,
+    wait_uptime,
+)
 
 
 class DB:
@@ -23,7 +36,10 @@ class Tags(TagsBase):
     #        -> tags callbacks (read/write methods) are call by this IO thread (not by tkinter main thread)
     D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
-    BLE_SENSOR_DATA = Tag(read=lambda: DB.main.get_js('json:ble-data'), io_every=2.0)
+    BLE_OUTDOOR_TEMP_C = Tag(read=lambda: DB.main.get_js('json:ble:outdoor:temp_c'), io_every=2.0)
+    BLE_OUTDOOR_HUM_P = Tag(read=lambda: DB.main.get_js('json:ble:outdoor:hum_p'), io_every=2.0)
+    BLE_KITCHEN_TEMP_C = Tag(read=lambda: DB.main.get_js('json:ble:kitchen:temp_c'), io_every=2.0)
+    BLE_KITCHEN_HUM_P = Tag(read=lambda: DB.main.get_js('json:ble:kitchen:hum_p'), io_every=2.0)
     METAR_DATA = Tag(read=lambda: DB.main.get_js('json:metar:lesquin'), io_every=2.0)
     IMG_ATMO_HDF = Tag(read=lambda: DB.main.get('img:static:logo-atmo-hdf:png'), io_every=10.0)
     IMG_MF = Tag(read=lambda: DB.main.get('img:static:logo-mf:png'), io_every=10.0)
@@ -140,12 +156,12 @@ class LiveTilesTab(TilesTab):
         # traffic map
         self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get(), crop=(30, 0, 530, 328))
         # outdoor ble data
-        temp_c = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'temp_c')), fmt='>6.1f')
-        hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('outdoor', 'hum_p')), fmt='>6.1f')
+        temp_c = fmt_value(Tags.BLE_OUTDOOR_TEMP_C.get(path='value'), fmt='>6.1f')
+        hum_p = fmt_value(Tags.BLE_OUTDOOR_HUM_P.get(path='value'), fmt='>6.1f')
         self.tl_ext.load(txt=f'Extérieur\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
         # kitchen ble data
-        temp_c = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'temp_c')), fmt='>6.1f')
-        hum_p = fmt_value(Tags.BLE_SENSOR_DATA.get(path=('kitchen', 'hum_p')), fmt='>6.1f')
+        temp_c = fmt_value(Tags.BLE_KITCHEN_TEMP_C.get(path='value'), fmt='>6.1f')
+        hum_p = fmt_value(Tags.BLE_KITCHEN_HUM_P.get(path='value'), fmt='>6.1f')
         self.tl_kit.load(txt=f'Cuisine\n\n\N{THERMOMETER} {temp_c} °C\n\N{BLACK DROPLET} {hum_p} %')
         # metar data
         update_fr = fmt_value(Tags.METAR_DATA.get(path='update_fr'), fmt='', alt_str='\t')

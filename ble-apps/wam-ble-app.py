@@ -59,21 +59,21 @@ def on_ble_msg(ble_msg: BleMessage):
     # store sensors values to DB
     if isinstance(ble_msg, TP357Msg):
         # sensor
-        DB.main.set_as_json(f'ble:{ble_msg.name}:model', dict(value='TP357'), ex=3600)
-        DB.main.set_as_json(f'ble:{ble_msg.name}:last_rx', dict(value=receive_dt.isoformat()), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:model', dict(value='TP357'), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:last_rx', dict(value=receive_dt.isoformat()), ex=3600)
         # data: temperature and humidity
-        DB.main.set_as_json(f'ble:{ble_msg.name}:temp_c', dict(value=ble_msg.temperature_c), ex=3600)
-        DB.main.set_as_json(f'ble:{ble_msg.name}:hum_p', dict(value=ble_msg.humidity_p), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:temp_c', dict(value=ble_msg.temperature_c), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:hum_p', dict(value=ble_msg.humidity_p), ex=3600)
     elif isinstance(ble_msg, SwitchBotMsg):
         # sensor
-        DB.main.set_as_json(f'ble:{ble_msg.name}:model', dict(value='SwitchBot'), ex=3600)
-        DB.main.set_as_json(f'ble:{ble_msg.name}:last_rx', dict(value=receive_dt.isoformat()), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:model', dict(value='SwitchBot'), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:last_rx', dict(value=receive_dt.isoformat()), ex=3600)
         # SwitchBot sensor have battery level as percent (not available on passive scan)
         if ble_msg.battery_p is not None:
-            DB.main.set_as_json(f'ble:{ble_msg.name}:batt_lvl', dict(value=ble_msg.battery_p), ex=3600)
+            DB.main.set_as_json(f'json:ble:{ble_msg.name}:batt_lvl', dict(value=ble_msg.battery_p), ex=3600)
         # data: temperature and humidity
-        DB.main.set_as_json(f'ble:{ble_msg.name}:temp_c', dict(value=ble_msg.temperature_c), ex=3600)
-        DB.main.set_as_json(f'ble:{ble_msg.name}:hum_p', dict(value=ble_msg.humidity_p), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:temp_c', dict(value=ble_msg.temperature_c), ex=3600)
+        DB.main.set_as_json(f'json:ble:{ble_msg.name}:hum_p', dict(value=ble_msg.humidity_p), ex=3600)
 
 
 def ble_detection_callback(device: BLEDevice, adv_data: AdvertisementData) -> None:
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     logger.setLevel(app_log_lvl)
     logging.getLogger('lib.custom_redis').setLevel(app_log_lvl)
     # startup message
-    logger.info('board-hmi-app started')
+    logger.info('board-ble-app started')
     # format id_name_dict to match address format (like 'AA:BB:CC:DD:EE:FF')
     id_name_dict = {key.upper().replace('-', ':'): value.lower().strip() for key, value in ID_NAME_DICT.items()}
     # build a set of authorized addresses
