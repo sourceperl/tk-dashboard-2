@@ -10,9 +10,7 @@ import re
 import ssl
 import time
 from urllib.request import Request, urlopen
-import zlib
 import dateutil.parser
-from cryptography.fernet import Fernet, InvalidToken
 import feedparser
 import schedule
 import PIL.Image
@@ -22,7 +20,7 @@ import PIL.Image
 import PIL.ImageDraw
 from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local, wait_uptime
 from lib.webdav import WebDAV
-from conf.private_loos import REDIS_USER, REDIS_PASS, DWEET_THING, DWEET_KEY, GMAP_IMG_URL, CAM_GATE_IMG_URL, CAM_DOOR_1_IMG_URL, CAM_DOOR_2_IMG_URL, \
+from conf.private_loos import REDIS_USER, REDIS_PASS, GMAP_IMG_URL, CAM_GATE_IMG_URL, CAM_DOOR_1_IMG_URL, CAM_DOOR_2_IMG_URL, \
     GSHEET_URL, OW_APP_ID, VIGILANCE_KEY, WEBDAV_URL, WEBDAV_USER, WEBDAV_PASS, WEBDAV_REGLEMENT_DOC_DIR, WEBDAV_CAROUSEL_IMG_DIR
 
 
@@ -79,46 +77,6 @@ def air_quality_atmo_hdf_job():
                      'valenciennes': zones_d.get('59606', 0)}
     # update redis
     DB.main.set_as_json('json:atmo', d_air_quality, ex=6*3600)
-
-
-@catch_log_except()
-def dweet_job():
-    # request
-    uo_ret = urlopen(f'https://dweet.io/get/latest/dweet/for/{DWEET_THING}', timeout=10.0)
-    dweet_msg = uo_ret.read()
-    data_d = json.loads(dweet_msg)
-    # check dweet success
-    if data_d['this'] != 'succeeded':
-        raise RuntimeError(f'dweet request failed with json: {data_d}')
-    # search your raw message
-    try:
-        raw_msg = data_d['with'][0]['content']['fly_tne_raw']
-    except (IndexError, KeyError):
-        raise RuntimeError('key missing in dweet message')
-    # check length or raw message
-    if not 20 < len(raw_msg) <= 2000:
-        raise RuntimeError('raw message have a wrong size')
-    # decrypt raw message (loses it's validity 20 mn after being encrypted)
-    try:
-        fernet = Fernet(key=DWEET_KEY)
-        msg_zip_plain = fernet.decrypt(raw_msg, ttl=20*60)
-    except InvalidToken:
-        raise RuntimeError('unable to decrypt message')
-    # decompress
-    msg_plain = zlib.decompress(msg_zip_plain)
-    # check format
-    try:
-        js_obj = json.loads(msg_plain)
-    except json.JSONDecodeError:
-        raise RuntimeError('decrypt message is not a valid json')
-    if type(js_obj) is not dict:
-        raise RuntimeError('json message is not a dict')
-    try:
-        titles_l = list(js_obj['nord'])
-    except (TypeError, KeyError):
-        raise RuntimeError('key "nord" is missing or have bad type in json message')
-    # if all is ok: publish json to redis
-    DB.main.set_as_json('json:flyspray-nord', titles_l, ex=3600)
 
 
 @catch_log_except()
@@ -557,7 +515,6 @@ if __name__ == '__main__':
     schedule.every(1).hours.do(owc_sync_carousel_job)
     schedule.every(1).hours.do(owc_sync_doc_job)
     schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
-    schedule.every(5).minutes.do(dweet_job)
     schedule.every(5).minutes.do(gsheet_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
     schedule.every(2).seconds.do(img_cam_gate_job)
@@ -573,7 +530,6 @@ if __name__ == '__main__':
 
     # first call
     air_quality_atmo_hdf_job()
-    dweet_job()
     gsheet_job()
     img_gmap_traffic_job()
     local_info_job()

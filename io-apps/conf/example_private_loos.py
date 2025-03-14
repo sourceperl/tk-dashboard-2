@@ -1,9 +1,10 @@
 # redis
 REDIS_USER = None
 REDIS_PASS = None
-# dweet
-DWEET_THING = ''
-DWEET_KEY = ''
+# MQTT
+MQTT_HOST = ''
+MQTT_FLY_TOPIC = ''
+MQTT_FLY_KEY = ''
 # gmap
 GMAP_IMG_URL = ''
 # cams
