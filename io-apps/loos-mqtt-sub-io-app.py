@@ -66,6 +66,7 @@ def fly_handler(json_msg: str):
 @catch_log_except()
 def on_connect(mqttc, obj, flags, reason_code, properties):
     logging.debug(f'connected to MQTT broker "{MQTT_HOST}" with code "{reason_code}"')
+    mqttc.subscribe(MQTT_FLY_TOPIC)
 
 
 @catch_log_except()
@@ -92,5 +93,4 @@ if __name__ == '__main__':
     mqttc.on_connect = on_connect
     mqttc.on_message = on_message
     mqttc.connect(MQTT_HOST, port=1883, keepalive=60)
-    mqttc.subscribe(MQTT_FLY_TOPIC)
     mqttc.loop_forever()
