@@ -2,13 +2,13 @@
 
 import logging
 import time
+
 import schedule
+from conf.private_loos import REDIS_PASS, REDIS_USER
+from lib.dashboard_io import catch_log_except, wait_uptime
 from pyHMI.DS_ModbusTCP import ModbusTCPDevice
 from pyHMI.DS_Redis import RedisDevice
 from pyHMI.Tag import Tag
-from lib.dashboard_io import catch_log_except, wait_uptime
-from conf.private_loos import REDIS_USER, REDIS_PASS
-
 
 # some const
 LTX_IP = '192.168.0.62'
@@ -52,18 +52,20 @@ class Devices(object):
 
 class Tags(object):
     # redis tags
-    RD_TOTAL_PWR = Tag(0, src=Devices.rd, ref={'type': 'int',
-                                               'key': 'int:loos_elec:pwr_act',
-                                               'ttl': 60})
-    RD_TODAY_WH = Tag(0.0, src=Devices.rd, ref={'type': 'float',
-                                                'key': 'float:loos_elec:today_wh',
-                                                'ttl': 86400})
+    RD_GARAGE_PWR = Tag(0, src=Devices.rd, ref={'type': 'float', 'key': 'float:loos_elec:garage_pwr', 'ttl': 120})
+    RD_COLD_WATER_PWR = Tag(0, src=Devices.rd, ref={'type': 'float',
+                            'key': 'float:loos_elec:cold_water_pwr', 'ttl': 120})
+    RD_LIGHT_PWR = Tag(0, src=Devices.rd, ref={'type': 'float', 'key': 'float:loos_elec:light_pwr', 'ttl': 120})
+    RD_TECH_PWR = Tag(0, src=Devices.rd, ref={'type': 'float', 'key': 'float:loos_elec:tech_pwr', 'ttl': 120})
+    RD_CTA_PWR = Tag(0, src=Devices.rd, ref={'type': 'float', 'key': 'float:loos_elec:cta_pwr', 'ttl': 120})
+    RD_HEATER_ROOM_PWR = Tag(0, src=Devices.rd, ref={'type': 'float', 'key': 'float:loos_elec:h_room_pwr', 'ttl': 120})
+
+    RD_TOTAL_PWR = Tag(0, src=Devices.rd, ref={'type': 'int', 'key': 'int:loos_elec:pwr_act', 'ttl': 60})
+    RD_TODAY_WH = Tag(0.0, src=Devices.rd, ref={'type': 'float', 'key': 'float:loos_elec:today_wh', 'ttl': 86400})
     RD_YESTERDAY_WH = Tag(0.0, src=Devices.rd, ref={'type': 'float',
-                                                    'key': 'float:loos_elec:yesterday_wh',
-                                                    'ttl': 172800})
+                          'key': 'float:loos_elec:yesterday_wh', 'ttl': 172800})
     RD_TIMESTAMP_WH = Tag(0.0, src=Devices.rd, ref={'type': 'float',
-                                                    'key': 'float:loos_elec:timestamp_wh',
-                                                    'ttl': 172800})
+                          'key': 'float:loos_elec:timestamp_wh', 'ttl': 172800})
     # modbus tags
     GARAGE_PWR = Tag(0.0, src=Devices.meter_garage, ref={'type': 'float', 'addr': AD_3155_LIVE_PWR, 'span': 1000})
     GARAGE_I_PWR = Tag(0, src=Devices.meter_garage, ref={'type': 'long', 'addr': AD_3155_INDEX_PWR, 'span': 1 / 1000})
@@ -88,7 +90,15 @@ class Tags(object):
 
 
 @catch_log_except()
-def db_refresh_job():
+def db_real_time_job():
+    # copy real-time measurements to redis keys
+    Tags.RD_GARAGE_PWR.val = Tags.GARAGE_PWR.val
+    Tags.RD_COLD_WATER_PWR.val = Tags.COLD_WATER_PWR.val
+    Tags.RD_LIGHT_PWR.val = Tags.LIGHT_PWR.val
+    Tags.RD_TECH_PWR.val = Tags.TECH_PWR.val
+    Tags.RD_CTA_PWR.val = Tags.CTA_PWR.val
+    Tags.RD_HEATER_ROOM_PWR.val = Tags.HEAT_PWR.val
+    # since last integrate delay
     since_last_integrate = time.time() - Tags.RD_TIMESTAMP_WH.val
     Tags.RD_TIMESTAMP_WH.val += since_last_integrate
     # integrate active power for daily index (if time since last integrate is regular)
@@ -114,14 +124,14 @@ if __name__ == '__main__':
     time.sleep(1.0)
 
     # init scheduler
-    schedule.every(5).seconds.do(db_refresh_job)
+    schedule.every(5).seconds.do(db_real_time_job)
     schedule.every().day.at('00:00').do(db_midnight_job)
-    
+
     # wait system ready (uptime > 25s)
     wait_uptime(min_s=25.0)
 
     # first call
-    db_refresh_job()
+    db_real_time_job()
 
     # main loop
     while True:
