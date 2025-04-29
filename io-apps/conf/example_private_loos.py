@@ -1,10 +1,9 @@
 # redis
 REDIS_USER = None
 REDIS_PASS = None
-# MQTT
-MQTT_HOST = ''
-MQTT_FLY_TOPIC = ''
-MQTT_FLY_KEY = ''
+# flyspray titles
+FLY_KEY = ''
+FLY_SHARE_URL = ''
 # gmap
 GMAP_IMG_URL = ''
 # cams
