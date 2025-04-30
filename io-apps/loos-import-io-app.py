@@ -110,10 +110,10 @@ def flyspray_job():
     # check length or raw message
     if not 20 < len(raw_msg) <= 2000:
         raise RuntimeError('raw message have a wrong size')
-    # decrypt raw message (loses it's validity 20 mn after being encrypted)
+    # decrypt raw message (loses it's validity 120 mn after being encrypted)
     try:
         fernet = Fernet(key=FLY_KEY)
-        msg_zip_plain = fernet.decrypt(raw_msg, ttl=20*60)
+        msg_zip_plain = fernet.decrypt(raw_msg, ttl=120*60)
     except InvalidToken:
         raise RuntimeError('unable to decrypt message')
     # decompress
@@ -571,7 +571,7 @@ if __name__ == '__main__':
     #schedule.every(1).hours.do(owc_sync_carousel_job)
     #schedule.every(1).hours.do(owc_sync_doc_job)
     schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
-    schedule.every(5).minutes.do(flyspray_job)
+    schedule.every(5).minutes.at(':15').do(flyspray_job)
     schedule.every(5).minutes.do(gsheet_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
     schedule.every(2).seconds.do(img_cam_gate_job)

@@ -55,6 +55,9 @@ echo 'start with cp example_private_data.py private_data.py'
 ```
 
 ```bash
+# create a system account for run process
+sudo useradd --system --shell=/usr/sbin/nologin board-io
+sudo usermod -a -G dialout board-io
 # supervisor setup
 sudo cp supervisor/tk-dashboard-loos.conf /etc/supervisor/conf.d/
 sudo supervisorctl update
