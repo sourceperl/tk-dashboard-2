@@ -16,9 +16,8 @@ GSHEET_URL= ''
 OW_APP_ID = ''
 # vigilance meteo
 VIGILANCE_KEY = ''
-# webdav
-WEBDAV_URL = ''
-WEBDAV_USER = ''
-WEBDAV_PASS = ''
-WEBDAV_REGLEMENT_DOC_DIR = ''
-WEBDAV_CAROUSEL_IMG_DIR = ''
+# sftp
+SFTP_HOSTNAME = ''
+SFTP_USERNAME = ''
+SFTP_IMG_DIR = ''
+SFTP_DOC_DIR = ''

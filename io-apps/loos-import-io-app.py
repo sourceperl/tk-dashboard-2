@@ -1,12 +1,11 @@
 #!/opt/tk-dashboard/virtualenvs/loos/venv/bin/python
 
+import argparse
 import hashlib
 import io
 import json
 import logging
-import os
 import re
-import ssl
 import time
 import zlib
 from datetime import datetime, timedelta, timezone
@@ -29,24 +28,23 @@ from conf.private_loos import (
     OW_APP_ID,
     REDIS_PASS,
     REDIS_USER,
+    SFTP_DOC_DIR,
+    SFTP_HOSTNAME,
+    SFTP_IMG_DIR,
+    SFTP_USERNAME,
     VIGILANCE_KEY,
-    WEBDAV_CAROUSEL_IMG_DIR,
-    WEBDAV_PASS,
-    WEBDAV_REGLEMENT_DOC_DIR,
-    WEBDAV_URL,
-    WEBDAV_USER,
 )
 from cryptography.fernet import Fernet, InvalidToken
 from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local, wait_uptime
-from lib.webdav import WebDAV
+from lib.sftp import FileInfos, SFTP_Indexed
 from metar.Metar import Metar
 
 # some const
 USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1'
 
-# some var
-owc_doc_dir_last_sync = 0
-owc_car_dir_last_sync = 0
+# some vars
+sftp_doc_sync_dt = datetime(year=2000, month=1, day=1, tzinfo=timezone.utc)
+sftp_img_sync_dt = datetime(year=2000, month=1, day=1, tzinfo=timezone.utc)
 
 
 # some class
@@ -77,7 +75,7 @@ def air_quality_atmo_hdf_job():
         # load record data
         r_code_zone = record['attributes']['code_zone']
         r_ts = int(record['attributes']['date_ech'])
-        r_dt = datetime.utcfromtimestamp(r_ts / 1000)
+        r_dt = datetime.fromtimestamp(r_ts / 1000, tz=timezone.utc)
         r_value = record['attributes']['code_qual']
         # retain today value
         if r_dt.date() == today_dt_date:
@@ -260,41 +258,43 @@ def openweathermap_forecast_job():
 
 
 @catch_log_except()
-def owc_updated_job():
-    # check if the owncloud directories has been updated by users (start sync jobs if need)
-    global owc_doc_dir_last_sync, owc_car_dir_last_sync
+def sftp_updated_job():
+    """ Check if the sftp directories index has been updated (start sync jobs if need). """
+    global sftp_doc_sync_dt, sftp_img_sync_dt
 
-    for f in wdv.ls():
-        item = f['file_path']
-        item_last_modified = int(f['dt_last_modified'].timestamp())
-        # document update ?
-        if item == WEBDAV_REGLEMENT_DOC_DIR:
-            # update need
-            if item_last_modified > owc_doc_dir_last_sync:
-                logging.debug(f'"{WEBDAV_REGLEMENT_DOC_DIR}" seem updated: run "owncloud_sync_doc_job"')
-                owc_sync_doc_job()
-                owc_doc_dir_last_sync = item_last_modified
-        # carousel update ?
-        elif item == WEBDAV_CAROUSEL_IMG_DIR:
-            # update need
-            if item_last_modified > owc_car_dir_last_sync:
-                logging.debug(f'"{WEBDAV_CAROUSEL_IMG_DIR}" seem updated: run "owncloud_sync_carousel_job"')
-                owc_sync_carousel_job()
-                owc_car_dir_last_sync = item_last_modified
+    with SFTP_Indexed(hostname=SFTP_HOSTNAME, username=SFTP_USERNAME) as sftp:
+        # image carousel directory
+        sftp.base_dir = SFTP_IMG_DIR
+        idx_img_attrs = sftp.index_attributes()
+        logging.debug(f'"{SFTP_IMG_DIR}" index size: {idx_img_attrs.size} bytes last update: {idx_img_attrs.mtime_dt}')
+        if idx_img_attrs.mtime_dt > sftp_img_sync_dt:
+            logging.info(f'index of "{SFTP_IMG_DIR}" change: run an SFTP sync')
+            sftp_sync_img_job(sftp)
+            sftp_img_sync_dt = idx_img_attrs.mtime_dt
+
+        # doc directory
+        sftp.base_dir = SFTP_DOC_DIR
+        idx_doc_attrs = sftp.index_attributes()
+        logging.debug(f'"{SFTP_IMG_DIR}" index size: {idx_doc_attrs.size} bytes last update: {idx_doc_attrs.mtime_dt}')
+        if idx_doc_attrs.mtime_dt > sftp_doc_sync_dt:
+            logging.info(f'index of "{SFTP_DOC_DIR}" change: run an SFTP sync')
+            # sftp_sync_doc_job()
+            sftp_doc_sync_dt = idx_doc_attrs.mtime_dt
 
 
 @catch_log_except()
-def owc_sync_carousel_job():
+def sftp_sync_img_job(sftp: SFTP_Indexed):
     # sync owncloud carousel directory with local
     # local constants
     DIR_CAR_INFOS = 'dir:carousel:infos'
     DIR_CAR_RAW = 'dir:carousel:raw:min-png'
+    FILE_MAX_SIZE = 10 * 1024 * 1024
 
     # local functions
-    def update_carousel_raw_data(filename, raw_data):
+    def update_carousel_raw_data(filename: str, raw_data: bytes):
         # build json infos record
-        md5 = hashlib.md5(raw_data).hexdigest()
-        js_infos = json.dumps(dict(size=len(raw_data), md5=md5))
+        sha256 = hashlib.sha256(raw_data).hexdigest()
+        js_infos = json.dumps(dict(size=len(raw_data), sha256=sha256))
         # convert raw data to PNG thumbnails
         # create default error image
         img_to_redis = PIL.Image.new('RGB', (655, 453), (255, 255, 255))
@@ -323,150 +323,150 @@ def owc_sync_carousel_job():
         pipe.execute()
 
     # log sync start
-    logging.info('start of sync for owncloud carousel')
-    # list local redis files
-    local_files_d = {}
-    for f_name, js_infos in DB.main.hgetall(DIR_CAR_INFOS).items():
+    logging.info('start of sync for images carousel')
+    # populate local_files_d with redis files
+    local_files_d: dict[str, FileInfos] = {}
+    for filename_as_bytes, json_as_bytes in DB.main.hgetall(DIR_CAR_INFOS).items():
         try:
-            filename = f_name.decode()
-            size = json.loads(js_infos)['size']
-            local_files_d[filename] = size
+            js_data_d = json.loads(json_as_bytes)
+            file_attrs = FileInfos(sha256=js_data_d['sha256'], size=js_data_d['size'])
+            local_files_d[filename_as_bytes.decode()] = file_attrs
         except ValueError:
             pass
     # check "dir:carousel:raw:min-png" consistency
     raw_file_l = [f.decode() for f in DB.main.hkeys(DIR_CAR_RAW)]
     # remove orphan infos record
-    for f in list(set(local_files_d) - set(raw_file_l)):
-        logging.debug(f'remove orphan "{f}" record in hash "{DIR_CAR_INFOS}"')
-        DB.main.hdel(DIR_CAR_INFOS, f)
-        del local_files_d[f]
+    for filename in list(set(local_files_d) - set(raw_file_l)):
+        logging.debug(f'remove orphan "{filename}" record in hash "{DIR_CAR_INFOS}"')
+        DB.main.hdel(DIR_CAR_INFOS, filename)
+        del local_files_d[filename]
     # remove orphan raw-png record
-    for f in list(set(raw_file_l) - set(local_files_d)):
-        logging.debug(f'remove orphan "{f}" record in hash "{DIR_CAR_RAW}"')
-        DB.main.hdel(DIR_CAR_RAW, f)
-    # list owncloud files (disallow directory)
-    own_files_d = {}
-    for f_d in wdv.ls(WEBDAV_CAROUSEL_IMG_DIR):
-        file_path = f_d['file_path']
-        size = f_d['content_length']
-        if file_path and not file_path.endswith('/'):
-            # search site only tags (_@loos_, _@messein_...) in filename
-            # site id is 16 chars max
-            site_tag_l = re.findall(r'_@([a-zA-Z0-9\-]{1,16})', file_path)
-            site_tag_l = [s.strip().lower() for s in site_tag_l]
-            site_tag_ok = 'loos' in site_tag_l or not site_tag_l
-            # download filter: ignore txt file or heavy fie (>10 MB)
-            filter_ok = not file_path.lower().endswith('.txt') \
-                and (size < 10 * 1024 * 1024) \
-                and site_tag_ok
-            # add file to owncloud dict
-            if filter_ok:
-                own_files_d[f_d['file_path']] = size
+    for filename in list(set(raw_file_l) - set(local_files_d)):
+        logging.debug(f'remove orphan "{filename}" record in hash "{DIR_CAR_RAW}"')
+        DB.main.hdel(DIR_CAR_RAW, filename)
+    # list sftp files (disallow directory)
+    remote_files_d: dict[str, FileInfos] = {}
+    sftp_index_d = sftp.get_index_as_dict()
+    for filename, sha256 in sftp_index_d.items():
+        # search site id (_@loos_, _@messein_...) in filename (max 16 chars)
+        site_id = None
+        site_pattern = r'_@([a-zA-Z0-9]{1,16})_'
+        match = re.search(site_pattern, filename)
+        if match:
+            site_id = match.group(1).lower()
+        # keep file conditions
+        file_attrs = sftp.get_file_attrs(filename)
+        site_id_ok = site_id is None or site_id == 'loos'
+        file_size_ok = file_attrs.size < FILE_MAX_SIZE
+        file_ext_ok = not filename.lower().endswith('.txt')
+        keep_file = site_id_ok and file_size_ok and file_ext_ok
+        if keep_file:
+            remote_files_d[filename] = FileInfos(sha256=sha256, size=file_attrs.size)
     # exist only on local redis
-    for f in list(set(local_files_d) - set(own_files_d)):
-        logging.info(f'"{f}" exist only on local -> remove it')
+    for filename in list(set(local_files_d) - set(remote_files_d)):
+        logging.info(f'"{filename}" exist only on local -> remove it')
         # redis remove (atomic)
         pipe = DB.main.pipeline()
-        pipe.hdel(DIR_CAR_INFOS, f)
-        pipe.hdel(DIR_CAR_RAW, f)
+        pipe.hdel(DIR_CAR_INFOS, filename)
+        pipe.hdel(DIR_CAR_RAW, filename)
         pipe.execute()
-    # exist only on remote owncloud
-    for f in list(set(own_files_d) - set(local_files_d)):
-        logging.info('"%s" exist only on remote -> download it' % f)
-        data = wdv.download(os.path.join(WEBDAV_CAROUSEL_IMG_DIR, f))
-        if data:
-            update_carousel_raw_data(f, data)
-    # exist at both side (update only if file size change)
-    for f in list(set(local_files_d).intersection(own_files_d)):
-        local_size = local_files_d[f]
-        remote_size = own_files_d[f]
-        logging.debug(f'check "{f}" remote size [{remote_size}]/local size [{local_size}]')
-        if local_size != remote_size:
-            logging.info(f'"{f}" size mismatch -> download it')
-            data = wdv.download(os.path.join(WEBDAV_CAROUSEL_IMG_DIR, f))
-            if data:
-                update_carousel_raw_data(f, data)
+    # exist only on remote sftp server
+    for filename in list(set(remote_files_d) - set(local_files_d)):
+        logging.info(f'"{filename}" exist only on remote -> download it')
+        raw_data = sftp.get_file_as_bytes(filename)
+        if raw_data:
+            update_carousel_raw_data(filename, raw_data)
+    # exist at both side (update only if hash change)
+    for filename in list(set(local_files_d).intersection(remote_files_d)):
+        local_sha256 = local_files_d[filename].sha256
+        remote_sha256 = remote_files_d[filename].sha256
+        logging.debug(f'check "{filename}" remote sha256 [{remote_sha256[:7]}]/local sha256 [{local_sha256[:7]}]')
+        if local_sha256 != remote_sha256:
+            logging.info(f'"{filename}" sha256 mismatch -> download it')
+            raw_data = sftp.get_file_as_bytes(filename)
+            if raw_data:
+                update_carousel_raw_data(filename, raw_data)
     # log sync end
     logging.info('end of sync for owncloud carousel')
 
 
-@catch_log_except()
-def owc_sync_doc_job():
-    # sync owncloud document directory with local
-    # local constants
-    DIR_DOC_INFOS = 'dir:doc:infos'
-    DIR_DOC_RAW = 'dir:doc:raw'
+# @catch_log_except()
+# def owc_sync_doc_job():
+#     # sync owncloud document directory with local
+#     # local constants
+#     DIR_DOC_INFOS = 'dir:doc:infos'
+#     DIR_DOC_RAW = 'dir:doc:raw'
 
-    # local functions
-    def update_doc_raw_data(filename, raw_data):
-        # build json infos record
-        md5 = hashlib.md5(raw_data).hexdigest()
-        js_infos = json.dumps(dict(size=len(raw_data), md5=md5))
-        # redis add  (atomic write)
-        pipe = DB.main.pipeline()
-        pipe.hset(DIR_DOC_INFOS, filename, js_infos)
-        pipe.hset(DIR_DOC_RAW, filename, raw_data)
-        pipe.execute()
+#     # local functions
+#     def update_doc_raw_data(filename, raw_data):
+#         # build json infos record
+#         md5 = hashlib.md5(raw_data).hexdigest()
+#         js_infos = json.dumps(dict(size=len(raw_data), md5=md5))
+#         # redis add  (atomic write)
+#         pipe = DB.main.pipeline()
+#         pipe.hset(DIR_DOC_INFOS, filename, js_infos)
+#         pipe.hset(DIR_DOC_RAW, filename, raw_data)
+#         pipe.execute()
 
-    # log sync start
-    logging.info('start of sync for owncloud doc')
-    # list local redis files
-    local_files_d = {}
-    for f_name, js_infos in DB.main.hgetall(DIR_DOC_INFOS).items():
-        try:
-            filename = f_name.decode()
-            size = json.loads(js_infos)['size']
-            local_files_d[filename] = size
-        except ValueError:
-            pass
-    # check "dir:doc:raw:min-png" consistency
-    raw_file_l = [f.decode() for f in DB.main.hkeys(DIR_DOC_RAW)]
-    # remove orphan infos record
-    for f in list(set(local_files_d) - set(raw_file_l)):
-        logging.debug(f'remove orphan "{f}" record in hash "{DIR_DOC_INFOS}"')
-        DB.main.hdel(DIR_DOC_INFOS, f)
-        del local_files_d[f]
-    # remove orphan raw-png record
-    for f in list(set(raw_file_l) - set(local_files_d)):
-        logging.debug(f'remove orphan "{f}" record in hash "{DIR_DOC_RAW}"')
-        DB.main.hdel(DIR_DOC_RAW, f)
-    # list owncloud files (disallow directory)
-    own_files_d = {}
-    for f_d in wdv.ls(WEBDAV_REGLEMENT_DOC_DIR):
-        file_path = f_d['file_path']
-        size = f_d['content_length']
-        if file_path and not file_path.endswith('/'):
-            # download filter: ignore txt file or heavy fie (>10 MB)
-            ok_load = not file_path.lower().endswith('.txt') \
-                and (size < 10 * 1024 * 1024)
-            if ok_load:
-                own_files_d[f_d['file_path']] = size
-    # exist only on local redis
-    for f in list(set(local_files_d) - set(own_files_d)):
-        logging.info(f'"{f}" exist only on local -> remove it')
-        # redis remove (atomic)
-        pipe = DB.main.pipeline()
-        pipe.hdel(DIR_DOC_INFOS, f)
-        pipe.hdel(DIR_DOC_RAW, f)
-        pipe.execute()
-    # exist only on remote owncloud
-    for f in list(set(own_files_d) - set(local_files_d)):
-        logging.info(f'"{f}" exist only on remote -> download it')
-        data = wdv.download(os.path.join(WEBDAV_REGLEMENT_DOC_DIR, f))
-        if data:
-            update_doc_raw_data(f, data)
-    # exist at both side (update only if file size change)
-    for f in list(set(local_files_d).intersection(own_files_d)):
-        local_size = local_files_d[f]
-        remote_size = own_files_d[f]
-        logging.debug(f'check "{f}" remote size [{remote_size}]/local size [{local_size}]')
-        if local_size != remote_size:
-            logging.info(f'"{f}" size mismatch -> download it')
-            data = wdv.download(os.path.join(WEBDAV_REGLEMENT_DOC_DIR, f))
-            if data:
-                update_doc_raw_data(f, data)
-    # log sync end
-    logging.info('end of sync for owncloud doc')
+#     # log sync start
+#     logging.info('start of sync for owncloud doc')
+#     # list local redis files
+#     local_files_d = {}
+#     for f_name, js_infos in DB.main.hgetall(DIR_DOC_INFOS).items():
+#         try:
+#             filename = f_name.decode()
+#             size = json.loads(js_infos)['size']
+#             local_files_d[filename] = size
+#         except ValueError:
+#             pass
+#     # check "dir:doc:raw:min-png" consistency
+#     raw_file_l = [f.decode() for f in DB.main.hkeys(DIR_DOC_RAW)]
+#     # remove orphan infos record
+#     for f in list(set(local_files_d) - set(raw_file_l)):
+#         logging.debug(f'remove orphan "{f}" record in hash "{DIR_DOC_INFOS}"')
+#         DB.main.hdel(DIR_DOC_INFOS, f)
+#         del local_files_d[f]
+#     # remove orphan raw-png record
+#     for f in list(set(raw_file_l) - set(local_files_d)):
+#         logging.debug(f'remove orphan "{f}" record in hash "{DIR_DOC_RAW}"')
+#         DB.main.hdel(DIR_DOC_RAW, f)
+#     # list owncloud files (disallow directory)
+#     own_files_d = {}
+#     for f_d in wdv.ls(SFTP_DOC_DIR):
+#         file_path = f_d['file_path']
+#         size = f_d['content_length']
+#         if file_path and not file_path.endswith('/'):
+#             # download filter: ignore txt file or heavy fie (>10 MB)
+#             ok_load = not file_path.lower().endswith('.txt') \
+#                 and (size < 10 * 1024 * 1024)
+#             if ok_load:
+#                 own_files_d[f_d['file_path']] = size
+#     # exist only on local redis
+#     for f in list(set(local_files_d) - set(own_files_d)):
+#         logging.info(f'"{f}" exist only on local -> remove it')
+#         # redis remove (atomic)
+#         pipe = DB.main.pipeline()
+#         pipe.hdel(DIR_DOC_INFOS, f)
+#         pipe.hdel(DIR_DOC_RAW, f)
+#         pipe.execute()
+#     # exist only on remote owncloud
+#     for f in list(set(own_files_d) - set(local_files_d)):
+#         logging.info(f'"{f}" exist only on remote -> download it')
+#         data = wdv.download(os.path.join(SFTP_DOC_DIR, f))
+#         if data:
+#             update_doc_raw_data(f, data)
+#     # exist at both side (update only if file size change)
+#     for f in list(set(local_files_d).intersection(own_files_d)):
+#         local_size = local_files_d[f]
+#         remote_size = own_files_d[f]
+#         logging.debug(f'check "{f}" remote size [{remote_size}]/local size [{local_size}]')
+#         if local_size != remote_size:
+#             logging.info(f'"{f}" size mismatch -> download it')
+#             data = wdv.download(os.path.join(SFTP_DOC_DIR, f))
+#             if data:
+#                 update_doc_raw_data(f, data)
+#     # log sync end
+#     logging.info('end of sync for owncloud doc')
 
 
 @catch_log_except()
@@ -553,30 +553,30 @@ def weather_today_job():
 
 # main
 if __name__ == '__main__':
+    # parse args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--debug', action='store_true', help='set debug mode')
+    # parse
+    args = parser.parse_args()
     # logging setup
-    logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
+    log_lvl = logging.DEBUG if args.debug else logging.INFO
+    log_fmt = '%(asctime)s - %(name)-24s - %(levelname)-8s - %(message)s'
+    logging.basicConfig(format=log_fmt, level=log_lvl)
+    logging.getLogger('paramiko').setLevel(logging.WARNING)
     logging.getLogger('PIL').setLevel(logging.INFO)
     logging.info('board-import-app started')
 
-    # init webdav client (with specific SSL context)
-    wdv_ssl_ctx = ssl.create_default_context()
-    wdv_ssl_ctx.check_hostname = False
-    wdv_ssl_ctx.verify_mode = ssl.CERT_NONE
-    # TODO replace above SSL context by self-signed server cert
-    # wdv_ssl_ctx.load_verify_locations('conf/cert/my-srv-cert.pem')
-    wdv = WebDAV(WEBDAV_URL, username=WEBDAV_USER, password=WEBDAV_PASS, ssl_ctx=wdv_ssl_ctx)
-
     # init scheduler
-    #schedule.every(5).minutes.do(owc_updated_job)
-    #schedule.every(1).hours.do(owc_sync_carousel_job)
-    #schedule.every(1).hours.do(owc_sync_doc_job)
+    schedule.every(5).minutes.do(sftp_updated_job)
+    # schedule.every(1).hours.do(owc_sync_carousel_job)
+    # schedule.every(1).hours.do(owc_sync_doc_job)
     schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
     schedule.every(5).minutes.at(':15').do(flyspray_job)
     schedule.every(5).minutes.do(gsheet_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
-    schedule.every(2).seconds.do(img_cam_gate_job)
-    schedule.every(2).seconds.do(img_cam_door_1_job)
-    schedule.every(2).seconds.do(img_cam_door_2_job)
+    # schedule.every(2).seconds.do(img_cam_gate_job)
+    # schedule.every(2).seconds.do(img_cam_door_1_job)
+    # schedule.every(2).seconds.do(img_cam_door_2_job)
     schedule.every(5).minutes.do(local_info_job)
     schedule.every(15).minutes.do(openweathermap_forecast_job)
     schedule.every(5).minutes.do(vigilance_job)
@@ -586,15 +586,18 @@ if __name__ == '__main__':
     wait_uptime(min_s=25.0)
 
     # first call
-    air_quality_atmo_hdf_job()
-    flyspray_job()
-    gsheet_job()
-    img_gmap_traffic_job()
-    local_info_job()
-    openweathermap_forecast_job()
-    vigilance_job()
-    weather_today_job()
-    #owc_updated_job()
+    #  TODO remove this
+    if None:
+        air_quality_atmo_hdf_job()
+        flyspray_job()
+        gsheet_job()
+        img_gmap_traffic_job()
+        local_info_job()
+        openweathermap_forecast_job()
+        vigilance_job()
+        weather_today_job()
+    sftp_updated_job()
+    exit()
 
     # main loop
     while True:
