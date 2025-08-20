@@ -8,7 +8,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Set, Tuple
+from typing import Any, Callable, Dict, Set, Tuple, Type, Union
 
 import pdf2image
 import PIL.Image
@@ -21,7 +21,52 @@ logger = logging.getLogger(__name__)
 
 
 # some function
-def catch_log_except(catch=None, log_lvl=logging.ERROR, limit_arg_len=40):
+def catch_log_except(catch: Union[Type[Exception], Tuple[Type[Exception]]] = None,
+                     log_lvl: int = logging.ERROR, limit_arg_len: int = 40):
+    """
+    A decorator factory to catch exceptions in a wrapped function and log them.
+
+    This decorator allows you to gracefully handle specific exceptions (or all
+    exceptions by default) that occur within a decorated function. Instead of
+    letting the exception propagate, it catches the exception, logs a concise
+    message, and then typically suppresses the re-raising of the exception (the
+    decorated function will effectively return `None` or whatever its normal
+    return value would be if an exception occurred, but the exception itself
+    is not re-raised by the decorator).
+
+    The logged message includes information about the exception type, the function
+    call (with arguments and keyword arguments truncated to prevent overly long
+    log lines), and the exception message itself.
+
+    Args:
+        catch (Union[Type[Exception], Tuple[Type[Exception], ...]], optional):
+            The type of exception(s) to catch. If `None` (default), it will catch
+            all `Exception` types. Can be a single exception class or a tuple of
+            exception classes.
+        log_lvl (int, optional): The logging level at which to log the caught
+            exception. Defaults to `logging.ERROR`.
+        limit_arg_len (int, optional): The maximum length for the string
+            representation of individual arguments and keyword argument values
+            in the logged function call string. Longer representations will be
+            truncated. Defaults to 40 characters.
+
+    Returns:
+        Callable: The actual decorator function, which takes a function as
+        input and returns the wrapped function.
+
+    Example:
+        ```python
+        @catch_log_except(catch=ValueError, log_lvl=logging.WARNING)
+        def process_data(data_str: str, debug_mode: bool = False):
+            if not data_str:
+                raise ValueError("Data cannot be empty")
+            if debug_mode:
+                print("Debugging mode active")
+            return f"Processed: {data_str}"
+
+        process_data("") # This will log a WARNING but not raise an error
+        ```
+    """
     # decorator to catch exception and produce one line log message
     if catch is None:
         catch = Exception

@@ -85,9 +85,6 @@ class MainApp(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         # tk stuff
-        # remove mouse icon in touchscreen mode (default)
-        if not app_conf.cursor:
-            self.config(cursor='none')
         # define style to fix size of tab header
         self.style = ttk.Style()
         self.style.theme_settings('default', {'TNotebook.Tab': {'configure': {'padding': [17, 17]}}})
@@ -302,18 +299,21 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--wait-up', action='store', type=float, default=30.0,
                         help='wait min sys uptime before tk start (default is 30s)')
     # populate global app_conf
-    app_conf = parser.parse_args()
+    args = parser.parse_args()
     # at startup: wait system ready (DB, display, RTC sync...)
     # set min uptime (default is 30s)
-    wait_uptime(app_conf.wait_up)
+    wait_uptime(args.wait_up)
     # logging setup
-    lvl = logging.DEBUG if app_conf.debug else logging.INFO
-    logging.basicConfig(format='%(asctime)s %(message)s', level=lvl)
+    log_lvl = logging.DEBUG if args.debug else logging.INFO
+    log_fmt = '%(asctime)s - %(name)-24s - %(levelname)-8s - %(message)s'
+    logging.basicConfig(format=log_fmt, level=log_lvl)
     logger.info('board-hmi-app started')
     # init Tags
     Tags.init()
     # start tkinter
     app = MainApp()
-    app.title('GRTgaz Dashboard')
-    app.attributes('-fullscreen', not app_conf.skip_full)
+    app.title('Dashboard')
+    app.attributes('-fullscreen', not args.skip_full)
+    # remove mouse icon in touchscreen mode (default)
+    app.config(cursor='' if args.cursor else 'none')
     app.mainloop()

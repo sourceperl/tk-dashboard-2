@@ -575,8 +575,7 @@ class DaysAccTileMessein(Tile):
     def __init__(self, *args, **kwargs):
         Tile.__init__(self, *args, **kwargs)
         # private
-        self._acc_date_dts = None
-        self._acc_date_digne = None
+        self._date_dts = None
         self._days_dts_str = tk.StringVar()
         # tk stuff
         # populate tile with blank grid parts
@@ -607,7 +606,7 @@ class DaysAccTileMessein(Tile):
             self.update()
 
     def update(self):
-        self._days_dts_str.set(self.day_from_now(self._acc_date_dts))
+        self._days_dts_str.set(self.day_from_now(self._date_dts))
 
     @staticmethod
     def day_from_now(date_str: str) -> str:
