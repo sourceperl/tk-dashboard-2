@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 
 import base64
-from datetime import datetime
 import functools
+import hashlib
+import io
 import json
 import logging
 import math
 import secrets
 import time
-from typing import Any
 import zlib
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, Set, Tuple
+
+import pdf2image
+import PIL.Image
+import PIL.ImageDraw
+from lib.sftp import FileInfos, SftpFileIndex
+
 import redis
+
+logger = logging.getLogger(__name__)
 
 
 # some function
@@ -36,17 +46,47 @@ def catch_log_except(catch=None, log_lvl=logging.ERROR, limit_arg_len=40):
                     func_args += repr(v) if len(repr(v)) < limit_arg_len else repr(v)[:limit_arg_len - 2] + '..'
                 func_call = f'{func.__name__}({func_args})'
                 # log message "except [except class] in f_name(args..., kwargs...): [except msg]"
-                logging.log(log_lvl, f'except {type(e)} in {func_call}: {e}')
+                logger.log(log_lvl, f'except {type(e)} in {func_call}: {e}')
 
         return wrapper
 
     return _catch_log_except
 
 
-def dt_utc_to_local(utc_dt):
-    now_ts = time.time()
-    offset = datetime.fromtimestamp(now_ts) - datetime.utcfromtimestamp(now_ts)
-    return utc_dt + offset
+def to_png_thumbnail(filename: str, raw_data: bytes, size: Tuple[int, int] = (655, 453)) -> bytes:
+    """
+    Converts raw image/PDF data to a resized PNG thumbnail.
+
+    Args:
+        filename (str): The original filename, used to determine the file type and for error logging.
+        raw_data (bytes): The raw byte data of the image or PDF.
+        size (Tuple[int, int], optional): The target size (width, height) for the thumbnail.
+                                          Defaults to (655, 453).
+
+    Returns:
+        bytes: The raw bytes of the generated PNG thumbnail.
+    """
+    img_to_redis = PIL.Image.new('RGB', size, color=(255, 255, 255))
+    draw = PIL.ImageDraw.Draw(img_to_redis)
+    draw.text((0, 0), f'loading error (src: "{filename}")', (0, 0, 0))
+
+    try:
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            img_to_redis = PIL.Image.open(io.BytesIO(raw_data))
+        elif filename.lower().endswith('.pdf'):
+            # Convert only the first page of the PDF
+            img_to_redis = pdf2image.convert_from_bytes(raw_data, first_page=1, last_page=1)[0]
+    except Exception as e:
+        logger.warning(f'failed to convert "{filename}" (error: {e})')
+        # default error image already set
+
+    # resize using thumbnail (maintains aspect ratio)
+    img_to_redis.thumbnail(size)
+
+    # get process result as raw bytes
+    io_to_redis = io.BytesIO()
+    img_to_redis.save(io_to_redis, format='PNG')
+    return io_to_redis.getvalue()
 
 
 def wait_uptime(min_s: float):
@@ -113,3 +153,160 @@ class CustomRedis(redis.Redis):
             return
         else:
             return json.loads(js_as_bytes.decode('utf-8'))
+
+
+class RedisFile:
+    def __init__(self, redis: CustomRedis, infos_key: str, raw_key: str, check: bool = True):
+        # args
+        self.redis = redis
+        self.infos_key = infos_key
+        self.raw_key = raw_key
+        # integrity check at initialization
+        if check:
+            self.remove_orphan()
+
+    def add_file(self, filename: str, raw_data: bytes, as_png_thumb: bool = False):
+        """
+        Calculates SHA256, optionaly converts image, and atomically stores carousel info and raw PNG.
+        """
+        sha256 = hashlib.sha256(raw_data).hexdigest()
+        js_infos = json.dumps(dict(size=len(raw_data), sha256=sha256))
+
+        if as_png_thumb:
+            raw_data = to_png_thumbnail(filename, raw_data)
+
+        pipe = self.redis.pipeline()
+        pipe.hset(self.infos_key, mapping={filename: js_infos})
+        pipe.hset(self.raw_key, mapping={filename: raw_data})
+        pipe.execute()
+        logger.debug(f'add "{filename}" to redis')
+
+    def delete_file(self, filename: str):
+        """
+        Calculates SHA256, optionaly converts image, and atomically stores carousel info and raw PNG.
+        """
+        pipe = self.redis.pipeline()
+        pipe.hdel(self.infos_key, filename)
+        pipe.hdel(self.raw_key, filename)
+        pipe.execute()
+        logger.debug(f'delete "{filename}" from redis')
+
+    def get_file_infos_as_dict(self) -> Dict[str, FileInfos]:
+        """
+        Loads file informations from Redis.
+        """
+        local_files: Dict[str, FileInfos] = {}
+        redis_infos: Dict[bytes, bytes] = self.redis.hgetall(self.infos_key)  # type: ignore
+
+        for filename_bytes, json_bytes in redis_infos.items():
+            try:
+                # decode filename from bytes to string
+                filename = filename_bytes.decode('utf-8')
+                js_data = json.loads(json_bytes.decode('utf-8'))
+
+                # basic validation
+                if 'sha256' in js_data and 'size' in js_data and isinstance(js_data['size'], int):
+                    local_files[filename] = FileInfos(sha256=js_data['sha256'], size=js_data['size'])
+                else:
+                    logger.warning(f"skipping malformed info record for '{filename}' (data: {js_data})")
+            except (UnicodeDecodeError, json.JSONDecodeError, KeyError, ValueError) as e:
+                msg = f"failed to parse info record for \"{filename_bytes.decode('utf-8', errors='ignore')}\". Error: {e}"
+                logger.warning(msg)
+        return local_files
+
+    def remove_orphan(self):
+        """Clean up local Redis inconsistencies (orphan records)."""
+        # list set of files in raw and infos keys
+        raw_keys_set = {f.decode('utf-8') for f in self.redis.hkeys(self.raw_key)}
+        redis_info_set = {f.decode('utf-8') for f in self.redis.hkeys(self.infos_key)}
+
+        # files in infos hash but not in raw hash
+        infos_only = redis_info_set - raw_keys_set
+        for filename in infos_only:
+            logger.warning(f'removing orphan "{filename}" file record in "{self.infos_key}"')
+            self.redis.hdel(self.infos_key, filename)
+            # remove from our local dict as well
+            redis_info_set.remove(filename)
+
+        # files in raw hash but not in infos hash
+        raw_only = raw_keys_set - redis_info_set
+        for filename in raw_only:
+            logger.warning(f'removing orphan "{filename}" file record in "{self.raw_key}"')
+            self.redis.hdel(self.raw_key, filename)
+
+    def sync_with_sftp(self, sftp_index: SftpFileIndex, allow_site: str, allow_max_size: int):
+        # get remote and local files
+        remote_file_infos_d = sftp_index.get_infos_d_filtered(by_site=allow_site, by_max_size=allow_max_size)
+        local_file_infos_d = self.get_file_infos_as_dict()
+        # sync actions
+        local_filenames_set: Set[str] = set(local_file_infos_d.keys())
+        remote_filenames_set: Set[str] = set(remote_file_infos_d.keys())
+        # files to remove from local (exist only on local)
+        to_remove = local_filenames_set - remote_filenames_set
+        for filename in to_remove:
+            logger.info(f'"{filename}" exists only locally -> removing from redis')
+            self.delete_file(filename)
+        # files to download (exist only on remote or hash mismatch)
+        to_download_set = remote_filenames_set - local_filenames_set
+        # check for files existing on both sides but with differing SHA256
+        for filename in local_filenames_set.intersection(remote_filenames_set):
+            local_sha256 = local_file_infos_d[filename].sha256
+            remote_sha256 = remote_file_infos_d[filename].sha256
+            msg = f'checking "{filename}" remote SHA256 [{remote_sha256[:7]}] vs. local SHA256 [{local_sha256[:7]}]'
+            logger.debug(msg)
+            if local_sha256 != remote_sha256:
+                logger.info(f'"{filename}" SHA256 mismatch -> adding to download list')
+                to_download_set.add(filename)
+        # process downloads
+        for filename in to_download_set:
+            logger.info(f'downloading and processing "{filename}" from SFTP')
+            raw_data = sftp_index.get_file_as_bytes(filename)
+            # ensure download was successful
+            if raw_data:
+                self.add_file(filename, raw_data, as_png_thumb=True)
+            else:
+                logger.warning(f'failed to download raw data for "{filename}"')
+
+
+class TrySync:
+    """Manages conditional synchronization with an SFTP directory based on index changes.
+
+    This class tracks the last known modification time of an SFTP directory's index.
+    It provides a `run` method that, when called, checks if the SFTP directory
+    has been updated since the last check. If changes are detected, a provided
+    synchronization function is executed.
+    """
+
+    def __init__(self, sftp_dir: str) -> None:
+        """Initializes the TrySync instance.
+
+        Args:
+            sftp_dir (str): The path to the SFTP directory to monitor for changes.
+        """
+        # args
+        self.sftp_dir = sftp_dir
+        # private
+        self._last_sync_dt = datetime(year=2000, month=1, day=1, tzinfo=timezone.utc)
+
+    def run(self, sftp_index: SftpFileIndex, on_sync_func: Callable):
+        """Executes a synchronization function if the SFTP directory's index has changed.
+
+        Args:
+            sftp_index (SftpFileIndex): An instance of `SftpFileIndex` connected to the SFTP server.
+                This object is used to access the SFTP directory's index and is
+                passed to the `on_sync_func` if a sync is triggered.
+            on_sync_func (Callable[[SftpFileIndex], Any]): A callable (function or method)
+                that will be executed if a change in the SFTP directory's index
+                is detected. This callable should accept one argument: the
+                `SftpFileIndex` instance.
+                Example signature: `def my_sync_function(sftp_index: SftpFileIndex) -> None: ...`
+        """
+        sftp_index.base_dir = self.sftp_dir
+        idx_attrs = sftp_index.index_attributes()
+        logger.debug(f'"{self.sftp_dir}" index size: {idx_attrs.size} bytes last update: {idx_attrs.mtime_dt}')
+        if idx_attrs.mtime_dt > self._last_sync_dt:
+            logger.info(f'index of "{self.sftp_dir}" change: run an SFTP sync')
+            on_sync_func(sftp_index)
+            self._last_sync_dt = idx_attrs.mtime_dt
+        else:
+            logger.debug(f'no change occur, skip sync')

@@ -12,17 +12,34 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class FileInfos:
+    """Represents essential information for file integrity and identification.
+
+    Attributes:
+        sha256 (str): The SHA256 checksum of the file's content, typically
+                      represented as a hexadecimal string. Used for integrity
+                      verification.
+        size (int): The size of the file in bytes.
+    """
     sha256: str
     size: int
 
 
 @dataclass
 class FileAttributes:
+    """Represents common attributes of a file, similar to filesystem metadata.
+
+    Attributes:
+        size (int): The size of the file in bytes.
+        mtime_dt (datetime): The last modification timestamp of the file.
+                              This datetime object should be timezone-aware,
+                              preferably in UTC, to avoid ambiguity when
+                              comparing across different systems or timezones.
+    """
     size: int
     mtime_dt: datetime
 
 
-class SFTP_Indexed:
+class SftpFileIndex:
     """
     A class to manage SFTP operations over an SSH connection, with a focus on sha256 file index mangement.
     """
@@ -157,7 +174,7 @@ class SFTP_Indexed:
         except FileNotFoundError:
             raise FileNotFoundError(f'remote file "{remote_full_path}" not found')
 
-    def get_index_as_dict(self, index_filename: Union[str, Path] = 'index.sha256') -> dict:
+    def get_sha256_as_dict(self, index_filename: Union[str, Path] = 'index.sha256') -> dict:
         """
         Reads a remote SHA256 index file and parses its contents into a dictionary.
 
@@ -183,6 +200,51 @@ class SFTP_Indexed:
                 sha_hash, filename = match.groups()
                 sha256_d[filename] = sha_hash.lower()
         return sha256_d
+
+    def get_infos_d_filtered(self, by_site: str, by_max_size: int) -> Dict[str, FileInfos]:
+        """
+        Retrieves and filters remote SFTP files based on predefined criteria.
+
+        Args:
+            by_site (str): The specific site ID to filter by. Files must match
+                this ID (case-insensitive) or have no site ID embedded in their
+                filename to pass this filter.
+            by_max_size (int): The maximum allowed file size in bytes. Files larger
+                than this size will be filtered out.
+
+        Returns:
+            Dict[str,FileInfos]: A dictionary where keys are the filenames (str)
+                that passed all filters, and values are their corresponding
+                `FileInfos` objects.
+        """
+        remote_files_d: Dict[str, FileInfos] = {}
+        sha256_d = self.get_sha256_as_dict()  # {filename: sha256, filename: sha256, ...}
+        # analyze all files currently in the index
+        for filename, sha256 in sha256_d.items():
+            # apply filters
+            # site ID check
+            site_field = None
+            match = re.search(r'_@([a-zA-Z0-9]{1,16})_', filename)
+            if match:
+                site_field = match.group(1).lower()
+            site_id_ok = site_field is None or site_field == by_site
+            # file size check (get actual size from SFTP attrs)
+            try:
+                file_attrs = self.get_file_attrs(filename)
+                file_size_ok = file_attrs.size <= by_max_size
+                file_infos = FileInfos(sha256=sha256, size=file_attrs.size)
+            except Exception as e:
+                logger.warning(f'could not get file attributes for "{filename}" (error: {e})')
+                continue
+            # file extension check (skip txt)
+            file_ext_ok = not filename.lower().endswith('.txt')
+            # build the return dict
+            if site_id_ok and file_size_ok and file_ext_ok:
+                remote_files_d[filename] = file_infos
+            else:
+                msg = f"skipping '{filename}' (site_id_ok: {site_id_ok}, size_ok: {file_size_ok}, ext_ok: {file_ext_ok})"
+                logger.debug(msg)
+        return remote_files_d
 
     def close(self):
         self.sftp_cli.close()

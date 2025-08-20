@@ -12,7 +12,7 @@ import PIL.Image
 from metar.Metar import Metar
 import PIL.Image
 import PIL.ImageDraw
-from lib.dashboard_io import CustomRedis, catch_log_except, dt_utc_to_local, wait_uptime
+from lib.dashboard_io import CustomRedis, catch_log_except, wait_uptime
 from conf.private_wam import REDIS_HALL_USER, REDIS_PASS, REDIS_HALL_PORT, REDIS_HALL_USER, REDIS_HALL_PASS, \
     GMAP_IMG_URL, VIGILANCE_KEY
 
@@ -170,8 +170,9 @@ def metar_lesquin_job():
     d_today = {}
     # message date and time
     if obs.time:
-        d_today['update_iso'] = obs.time.strftime('%Y-%m-%dT%H:%M:%SZ')
-        d_today['update_fr'] = dt_utc_to_local(obs.time).strftime('%H:%M %d/%m')
+        dt_utc = obs.time.replace(tzinfo=timezone.utc)
+        d_today['update_iso'] = dt_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        d_today['update_fr'] = dt_utc.astimezone().strftime('%H:%M %d/%m')
     # current temperature
     if obs.temp:
         d_today['temp'] = round(obs.temp.value('C'))
