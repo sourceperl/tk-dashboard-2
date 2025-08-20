@@ -70,7 +70,8 @@ def sync_sftp_img(sftp_index: SftpFileIndex):
     # log sync start
     logger.info('start of sync for images carousel')
     redis_file = RedisFile(DB.main, infos_key=KEY_CAR_INFOS, raw_key=KEY_CAR_RAW)
-    redis_file.sync_with_sftp(sftp_index, allow_site=SITE_ID, allow_max_size=FILE_MAX_SIZE)
+    filtered_index_d = sftp_index.get_index_as_dict_filtered(by_site=SITE_ID, by_max_size=FILE_MAX_SIZE)
+    redis_file.sync_with_sftp(sftp_index, to_sync_d=filtered_index_d, to_png_thumb=True)
     logger.info('end of images carousel sync')
 
 
@@ -82,7 +83,8 @@ def sync_sftp_doc(sftp_index: SftpFileIndex):
     # log sync start
     logger.info('start of document sync')
     redis_file = RedisFile(DB.main, infos_key=KEY_DOC_INFOS, raw_key=KEY_DOC_RAW)
-    redis_file.sync_with_sftp(sftp_index, allow_site=SITE_ID, allow_max_size=FILE_MAX_SIZE)
+    filtered_index_d = sftp_index.get_index_as_dict_filtered(by_site=SITE_ID, by_max_size=FILE_MAX_SIZE)
+    redis_file.sync_with_sftp(sftp_index, to_sync_d=filtered_index_d,to_png_thumb=False)
     logger.info('end of document sync')
 
 
@@ -400,35 +402,32 @@ if __name__ == '__main__':
     try_sync_doc = TrySync(SFTP_DOC_DIR)
 
     # init scheduler
-    schedule.every(5).minutes.do(sftp_updated_job)
-    schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
-    schedule.every(5).minutes.at(':15').do(flyspray_job)
-    schedule.every(5).minutes.do(gsheet_job)
-    schedule.every(2).minutes.do(img_gmap_traffic_job)
     schedule.every(2).seconds.do(img_cam_gate_job)
     schedule.every(2).seconds.do(img_cam_door_1_job)
     schedule.every(2).seconds.do(img_cam_door_2_job)
+    schedule.every(5).minutes.do(sftp_updated_job)
+    schedule.every(5).minutes.at(':15').do(flyspray_job)
+    schedule.every(5).minutes.do(gsheet_job)
+    schedule.every(2).minutes.do(img_gmap_traffic_job)
     schedule.every(5).minutes.do(local_info_job)
-    schedule.every(15).minutes.do(openweathermap_forecast_job)
     schedule.every(5).minutes.do(vigilance_job)
     schedule.every(5).minutes.do(weather_today_job)
+    schedule.every(15).minutes.do(openweathermap_forecast_job)
+    schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
 
     # wait system ready (uptime > 25s)
     wait_uptime(min_s=25.0)
 
     # first call
-    #  TODO remove this
-    if None:
-        air_quality_atmo_hdf_job()
-        flyspray_job()
-        gsheet_job()
-        img_gmap_traffic_job()
-        local_info_job()
-        openweathermap_forecast_job()
-        vigilance_job()
-        weather_today_job()
+    air_quality_atmo_hdf_job()
+    flyspray_job()
+    gsheet_job()
+    img_gmap_traffic_job()
+    local_info_job()
+    openweathermap_forecast_job()
+    vigilance_job()
+    weather_today_job()
     sftp_updated_job()
-    exit()
 
     # main loop
     while True:

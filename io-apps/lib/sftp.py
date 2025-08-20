@@ -11,22 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class FileInfos:
-    """Represents essential information for file integrity and identification.
-
-    Attributes:
-        sha256 (str): The SHA256 checksum of the file's content, typically
-                      represented as a hexadecimal string. Used for integrity
-                      verification.
-        size (int): The size of the file in bytes.
-    """
-    sha256: str
-    size: int
-
-
-@dataclass
 class FileAttributes:
-    """Represents common attributes of a file, similar to filesystem metadata.
+    """
+    Represents common attributes of a file, similar to filesystem metadata.
 
     Attributes:
         size (int): The size of the file in bytes.
@@ -174,7 +161,7 @@ class SftpFileIndex:
         except FileNotFoundError:
             raise FileNotFoundError(f'remote file "{remote_full_path}" not found')
 
-    def get_sha256_as_dict(self, index_filename: Union[str, Path] = 'index.sha256') -> dict:
+    def get_index_as_dict(self, index_filename: Union[str, Path] = 'index.sha256') -> Dict[str, str]:
         """
         Reads a remote SHA256 index file and parses its contents into a dictionary.
 
@@ -201,7 +188,7 @@ class SftpFileIndex:
                 sha256_d[filename] = sha_hash.lower()
         return sha256_d
 
-    def get_infos_d_filtered(self, by_site: str, by_max_size: int) -> Dict[str, FileInfos]:
+    def get_index_as_dict_filtered(self, by_site: str, by_max_size: int) -> Dict[str, str]:
         """
         Retrieves and filters remote SFTP files based on predefined criteria.
 
@@ -213,14 +200,13 @@ class SftpFileIndex:
                 than this size will be filtered out.
 
         Returns:
-            Dict[str,FileInfos]: A dictionary where keys are the filenames (str)
+            Dict[str,str]: A dictionary where keys are the filenames (str)
                 that passed all filters, and values are their corresponding
                 `FileInfos` objects.
         """
-        remote_files_d: Dict[str, FileInfos] = {}
-        sha256_d = self.get_sha256_as_dict()  # {filename: sha256, filename: sha256, ...}
+        sha256_d: Dict[str, str] = {}
         # analyze all files currently in the index
-        for filename, sha256 in sha256_d.items():
+        for filename, sha256 in self.get_index_as_dict().items():
             # apply filters
             # site ID check
             site_field = None
@@ -232,7 +218,6 @@ class SftpFileIndex:
             try:
                 file_attrs = self.get_file_attrs(filename)
                 file_size_ok = file_attrs.size <= by_max_size
-                file_infos = FileInfos(sha256=sha256, size=file_attrs.size)
             except Exception as e:
                 logger.warning(f'could not get file attributes for "{filename}" (error: {e})')
                 continue
@@ -240,11 +225,11 @@ class SftpFileIndex:
             file_ext_ok = not filename.lower().endswith('.txt')
             # build the return dict
             if site_id_ok and file_size_ok and file_ext_ok:
-                remote_files_d[filename] = file_infos
+                sha256_d[filename] = sha256
             else:
                 msg = f"skipping '{filename}' (site_id_ok: {site_id_ok}, size_ok: {file_size_ok}, ext_ok: {file_ext_ok})"
                 logger.debug(msg)
-        return remote_files_d
+        return sha256_d
 
     def close(self):
         self.sftp_cli.close()

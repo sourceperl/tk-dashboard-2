@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
 
-import base64
 import functools
 import hashlib
 import io
 import json
 import logging
-import math
-import secrets
 import time
-import zlib
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Set, Tuple
 
 import pdf2image
 import PIL.Image
 import PIL.ImageDraw
-from lib.sftp import FileInfos, SftpFileIndex
+from lib.sftp import SftpFileIndex
 
 import redis
 
@@ -90,6 +87,16 @@ def to_png_thumbnail(filename: str, raw_data: bytes, size: Tuple[int, int] = (65
 
 
 def wait_uptime(min_s: float):
+    """Waits until the system's uptime exceeds a specified minimum duration.
+
+    Note: This function is specific to Linux/Unix-like operating systems that
+    expose uptime information via `/proc/uptime`. It will not work on Windows
+    or other systems without this file.
+
+    Args:
+        min_s (float): The minimum uptime duration in seconds that must be
+                       reached before the function returns.
+    """
     while True:
         uptime = float(open('/proc/uptime', 'r').readline().split()[0])
         if uptime > min_s:
@@ -97,44 +104,58 @@ def wait_uptime(min_s: float):
         time.sleep(0.1)
 
 
-def byte_xor(data_1: bytes, data_2: bytes) -> bytes:
-    return bytes([a ^ b for a, b in zip(data_1, data_2)])
+# def byte_xor(data_1: bytes, data_2: bytes) -> bytes:
+#     return bytes([a ^ b for a, b in zip(data_1, data_2)])
 
 
-def data_encode(data: bytes, key: bytes) -> bytes:
-    # compress data
-    data_zip = zlib.compress(data)
-    # generate a random token
-    rand_token = secrets.token_bytes(128)
-    # xor the random token and the private key
-    key_mask = key * math.ceil(len(rand_token) / len(key))
-    token_part = byte_xor(rand_token, key_mask)
-    # xor data and token
-    token_mask = rand_token * math.ceil(len(data_zip) / len(rand_token))
-    data_part = byte_xor(data_zip, token_mask)
-    # concatenate xor random token and xor data
-    bin_msg = token_part + data_part
-    # encode binary message with base64
-    return base64.b64encode(bin_msg)
+# def data_encode(data: bytes, key: bytes) -> bytes:
+#     # compress data
+#     data_zip = zlib.compress(data)
+#     # generate a random token
+#     rand_token = secrets.token_bytes(128)
+#     # xor the random token and the private key
+#     key_mask = key * math.ceil(len(rand_token) / len(key))
+#     token_part = byte_xor(rand_token, key_mask)
+#     # xor data and token
+#     token_mask = rand_token * math.ceil(len(data_zip) / len(rand_token))
+#     data_part = byte_xor(data_zip, token_mask)
+#     # concatenate xor random token and xor data
+#     bin_msg = token_part + data_part
+#     # encode binary message with base64
+#     return base64.b64encode(bin_msg)
 
 
-def data_decode(data: bytes, key: bytes) -> bytes:
-    # decode base64 msg
-    bin_msg = base64.b64decode(data)
-    # split message: [xor_token part : xor_data part]
-    token_part = bin_msg[:128]
-    data_part = bin_msg[128:]
-    # token = xor_token xor private key
-    key_mask = key * math.ceil(len(token_part) / len(key))
-    token = byte_xor(token_part, key_mask)
-    # compressed data = xor_data xor token
-    token_mask = token * math.ceil(len(data_part) / len(token))
-    c_data = byte_xor(data_part, token_mask)
-    # return decompress data
-    return zlib.decompress(c_data)
+# def data_decode(data: bytes, key: bytes) -> bytes:
+#     # decode base64 msg
+#     bin_msg = base64.b64decode(data)
+#     # split message: [xor_token part : xor_data part]
+#     token_part = bin_msg[:128]
+#     data_part = bin_msg[128:]
+#     # token = xor_token xor private key
+#     key_mask = key * math.ceil(len(token_part) / len(key))
+#     token = byte_xor(token_part, key_mask)
+#     # compressed data = xor_data xor token
+#     token_mask = token * math.ceil(len(data_part) / len(token))
+#     c_data = byte_xor(data_part, token_mask)
+#     # return decompress data
+#     return zlib.decompress(c_data)
 
 
 # some class
+@dataclass
+class FileInfos:
+    """Represents essential information for file integrity and identification.
+
+    Attributes:
+        sha256 (str): The SHA256 checksum of the file's content, typically
+                      represented as a hexadecimal string. Used for integrity
+                      verification.
+        size (int): The size of the file in bytes.
+    """
+    sha256: str
+    size: int
+
+
 class CustomRedis(redis.Redis):
     LOG_LEVEL = logging.ERROR
 
@@ -215,11 +236,18 @@ class RedisFile:
         return local_files
 
     def remove_orphan(self):
-        """Clean up local Redis inconsistencies (orphan records)."""
+        """
+        Cleans up inconsistent (orphan) file records in Redis HASHes.
+
+        An 'orphan' record is defined as a filename that exists as a field in
+        either the 'infos' HASH (`self.infos_key`) or the 'raw' HASH
+        (`self.raw_key`), but not in both. This method identifies such
+        inconsistencies and removes the orphaned entries to maintain data integrity
+        and prevent stale or broken references.
+        """
         # list set of files in raw and infos keys
         raw_keys_set = {f.decode('utf-8') for f in self.redis.hkeys(self.raw_key)}
         redis_info_set = {f.decode('utf-8') for f in self.redis.hkeys(self.infos_key)}
-
         # files in infos hash but not in raw hash
         infos_only = redis_info_set - raw_keys_set
         for filename in infos_only:
@@ -227,20 +255,32 @@ class RedisFile:
             self.redis.hdel(self.infos_key, filename)
             # remove from our local dict as well
             redis_info_set.remove(filename)
-
         # files in raw hash but not in infos hash
         raw_only = raw_keys_set - redis_info_set
         for filename in raw_only:
             logger.warning(f'removing orphan "{filename}" file record in "{self.raw_key}"')
             self.redis.hdel(self.raw_key, filename)
 
-    def sync_with_sftp(self, sftp_index: SftpFileIndex, allow_site: str, allow_max_size: int):
+    def sync_with_sftp(self, sftp_index: SftpFileIndex, to_sync_d: Dict[str, str], to_png_thumb: bool = False):
+        """Synchronizes local Redis-stored files with a remote SFTP index.
+
+        Args:
+            sftp_index (SftpFileIndex): An object providing access to SFTP file 
+                index operations.
+            to_sync_d (Dict[str, str]): A dictionary representing the current
+                state of relevant remote files on SFTP. Keys are filenames (str),
+                and values are their SHA256 checksums (str). This acts as the
+                source of truth for remote file information during the sync.
+            to_png_thumb (bool, optional): If `True`, downloaded raw file data
+                will be converted to a PNG thumbnail before being stored/updated
+                in Redis. If `False`, the raw data will be stored as is.
+                Defaults to `False`
+        """
         # get remote and local files
-        remote_file_infos_d = sftp_index.get_infos_d_filtered(by_site=allow_site, by_max_size=allow_max_size)
         local_file_infos_d = self.get_file_infos_as_dict()
         # sync actions
         local_filenames_set: Set[str] = set(local_file_infos_d.keys())
-        remote_filenames_set: Set[str] = set(remote_file_infos_d.keys())
+        remote_filenames_set: Set[str] = set(to_sync_d.keys())
         # files to remove from local (exist only on local)
         to_remove = local_filenames_set - remote_filenames_set
         for filename in to_remove:
@@ -251,7 +291,7 @@ class RedisFile:
         # check for files existing on both sides but with differing SHA256
         for filename in local_filenames_set.intersection(remote_filenames_set):
             local_sha256 = local_file_infos_d[filename].sha256
-            remote_sha256 = remote_file_infos_d[filename].sha256
+            remote_sha256 = to_sync_d[filename]
             msg = f'checking "{filename}" remote SHA256 [{remote_sha256[:7]}] vs. local SHA256 [{local_sha256[:7]}]'
             logger.debug(msg)
             if local_sha256 != remote_sha256:
@@ -263,7 +303,7 @@ class RedisFile:
             raw_data = sftp_index.get_file_as_bytes(filename)
             # ensure download was successful
             if raw_data:
-                self.add_file(filename, raw_data, as_png_thumb=True)
+                self.add_file(filename, raw_data, as_png_thumb=to_png_thumb)
             else:
                 logger.warning(f'failed to download raw data for "{filename}"')
 

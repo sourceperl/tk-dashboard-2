@@ -2,14 +2,40 @@
 
 import argparse
 import logging
-from typing import Any
 import tkinter as tk
 from tkinter import ttk
-from lib.dashboard_ui import \
-    AsyncTask, CustomRedis, Tag, TagsBase, TilesTab, PdfTilesTab, wait_uptime, \
-    AirQualityTile, ClockTile, DaysAccTileLoos, GaugeTile, NewsBannerTile, \
-    FlysprayTile, ImageRawTile, ImageRawCarouselTile, VigilanceTile, WattsTile, WeatherTile
-from conf.private_loos import REDIS_USER, REDIS_PASS, REM_REDIS_HOST, REM_REDIS_PORT, REM_REDIS_USER, REM_REDIS_PASS
+from typing import Any
+
+from conf.private_loos import (
+    REDIS_PASS,
+    REDIS_USER,
+    REM_REDIS_HOST,
+    REM_REDIS_PASS,
+    REM_REDIS_PORT,
+    REM_REDIS_USER,
+)
+from lib.dashboard_ui import (
+    AirQualityTile,
+    AsyncTask,
+    ClockTile,
+    CustomRedis,
+    DaysAccTileLoos,
+    FlysprayTile,
+    GaugeTile,
+    ImageRawCarouselTile,
+    ImageRawTile,
+    NewsBannerTile,
+    PdfTilesTab,
+    Tag,
+    TagsBase,
+    TilesTab,
+    VigilanceTile,
+    WattsTile,
+    WeatherTile,
+    wait_uptime,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class DB:
@@ -47,7 +73,7 @@ class Tags(TagsBase):
 
 class RemRedisActionsTask(AsyncTask):
     def do(self, item: Any):
-        logging.info(f'request "{item}" action')
+        logger.info(f'request "{item}" action')
         DB.remote.publish(channel='pub:actions', message=item)
 
 
@@ -283,7 +309,7 @@ if __name__ == '__main__':
     # logging setup
     lvl = logging.DEBUG if app_conf.debug else logging.INFO
     logging.basicConfig(format='%(asctime)s %(message)s', level=lvl)
-    logging.info('board-hmi-app started')
+    logger.info('board-hmi-app started')
     # init Tags
     Tags.init()
     # start tkinter

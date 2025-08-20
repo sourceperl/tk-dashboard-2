@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
 
-from datetime import datetime, timedelta
 import copy
 import functools
 import io
 import json
-import math
-import os
-import subprocess
-import tempfile
-from typing import Any, Callable, List, Union
 import locale
 import logging
+import math
+import os
 import queue
+import subprocess
+import tempfile
 import threading
 import time
-import traceback
 import tkinter as tk
-import redis
+import traceback
+from datetime import datetime, timedelta
+from typing import Any, Callable, List, Union
+
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
 import PIL.ImageTk
 
-# global configuration
+import redis
+
+logger = logging.getLogger(__name__)
 # avoid PIL debug message
 logging.getLogger('PIL').setLevel(logging.WARNING)
 
@@ -110,7 +112,7 @@ class AsyncTask:
                 item = self._queue.get()
                 self.do(item)
             except Exception as e:
-                logging.warning(f'except {type(e).__name__} in {type(self).__name__}: {e}')
+                logger.warning(f'except {type(e).__name__} in {type(self).__name__}: {e}')
             finally:
                 self._queue.task_done()
 
@@ -164,7 +166,7 @@ class Tag:
                 self._th_last_run = t_now
                 # if read method is define, do it
                 if callable(self._read_cmd):
-                    logging.debug(f'IO thread call read cmd' + f' [ref {ref}]' if ref else f'')
+                    logger.debug(f'IO thread call read cmd' + f' [ref {ref}]' if ref else f'')
                     # secure call to read method callback, catch any exception
                     try:
                         cache_value = self._read_cmd()
@@ -175,7 +177,7 @@ class Tag:
                         self._value = cache_value
                 # if write method is define, do it
                 if callable(self._write_cmd):
-                    logging.debug(f'IO thread call write cmd' + f' [ref {ref}]' if ref else f'')
+                    logger.debug(f'IO thread call write cmd' + f' [ref {ref}]' if ref else f'')
                     # avoid lock thread during _write_cmd() IO stuff
                     # read internal tag value
                     with self._lock:
@@ -382,7 +384,7 @@ class PdfTilesTab(TilesTab):
                         r += 1
                         c = 1
         except Exception:
-            logging.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
 
 
 # Tiles library
@@ -751,7 +753,7 @@ class ImageRawTile(Tile):
             img = bytes(img)
         except (TypeError, ValueError):
             img = None
-        # display current image or 'n/a' 
+        # display current image or 'n/a'
         try:
             widget_size = (self.winfo_width(), self.winfo_height())
             if img:
@@ -775,7 +777,7 @@ class ImageRawTile(Tile):
             self.tk_img = PIL.ImageTk.PhotoImage(pil_img)
             self.lbl_img.configure(image=self.tk_img)
         except Exception:
-            logging.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
 
 
 class ImageRawCarouselTile(ImageRawTile):
@@ -894,7 +896,7 @@ class NewsBannerTile(Tile):
             self._next_ban_str = spaces_head + 'n/a' + spaces_head
         except Exception:
             self._next_ban_str = spaces_head + 'n/a' + spaces_head
-            logging.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
 
 
 class VigilanceTile(Tile):
@@ -927,11 +929,11 @@ class VigilanceTile(Tile):
         try:
             level = int(level)
         except (TypeError, ValueError):
-            level = None        
+            level = None
         try:
             risk_id_l = list(risk_id_l)
         except (TypeError, ValueError):
-            risk_id_l = None        
+            risk_id_l = None
         # on change -> update widget
         if self._vig_level != level or self._risk_ids != risk_id_l:
             self._vig_level = level
@@ -992,7 +994,7 @@ class WattsTile(Tile):
         try:
             self._today_wh = float(today_wh)
         except (TypeError, ValueError):
-            self._today_wh = None        
+            self._today_wh = None
         try:
             self._yesterday_wh = float(yesterday_wh)
         except (TypeError, ValueError):
@@ -1082,7 +1084,7 @@ class WeatherTile(Tile):
                       f'Mise à jour    : {update_fr}\n'
                 self.lbl_today.configure(text=msg)
             except Exception:
-                logging.error(traceback.format_exc())
+                logger.error(traceback.format_exc())
                 self.lbl_today.configure(text='error')
         else:
             self.lbl_today.configure(text='n/a')
@@ -1104,7 +1106,7 @@ class WeatherTile(Tile):
                     msg = f'{day_desr}\n\nT min {day_t_min:.0f}°C\nT max {day_t_max:.0f}°C'
                     self._days_lbl[i].configure(text=msg)
             except Exception:
-                logging.error(traceback.format_exc())
+                logger.error(traceback.format_exc())
                 # update days labels to 'n/a' error message
                 for i in range(4):
                     self._days_lbl[i].configure(text='error')
@@ -1140,9 +1142,12 @@ class PdfLauncherTile(Tile):
             if raw_data:
                 tmp_f = tempfile.NamedTemporaryFile(prefix='board-', suffix='.pdf', delete=True)
                 tmp_f.write(raw_data)
+                logger.debug(f'{raw_data}')
                 # open it with xpdf
                 xpdf_geometry = '-geometry %sx%s' % (self.master.winfo_width(), self.master.winfo_height() - 10)
-                ps = subprocess.Popen(['/usr/bin/xpdf', xpdf_geometry, '-z page', '-cont', tmp_f.name],
+                cmd = f'/usr/bin/xpdf {xpdf_geometry} -z page -cont {tmp_f.name}'
+                logger.debug(f'start external command: "{cmd}"')
+                ps = subprocess.Popen(cmd.split(),
                                       stdin=subprocess.DEVNULL,
                                       stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL,
@@ -1152,7 +1157,7 @@ class PdfLauncherTile(Tile):
                 # remove temp file after xpdf startup
                 self.after(ms=1000, func=tmp_f.close)
         except Exception:
-            logging.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
 
     def _on_unmap(self, _evt):
         # terminate all xpdf process on tab exit
