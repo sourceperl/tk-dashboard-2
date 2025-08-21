@@ -1,4 +1,4 @@
-#!/opt/tk-dashboard/virtualenvs/loos/venv/bin/python
+#!/opt/tk-dashboard/virtualenvs/messein/venv/bin/python
 
 import argparse
 import io
@@ -6,22 +6,18 @@ import json
 import logging
 import time
 import zlib
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import dateutil.parser
 import feedparser
 import schedule
-from conf.private_loos import (
-    CAM_DOOR_1_IMG_URL,
-    CAM_DOOR_2_IMG_URL,
-    CAM_GATE_IMG_URL,
+from conf.private_messein import (
     FLY_KEY,
     FLY_SHARE_URL,
     GMAP_IMG_URL,
     GSHEET_URL,
-    OW_APP_ID,
     REDIS_PASS,
     REDIS_USER,
     SFTP_DOC_DIR,
@@ -39,14 +35,13 @@ from lib.dashboard_io import (
     wait_uptime,
 )
 from lib.sftp import SftpFileIndex
-from metar.Metar import Metar
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
 
 
 # some const
-SITE_ID = 'loos'
+SITE_ID = 'messein'
 USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1'
 KEY_CAR_INFOS = 'dir:carousel:infos'
 KEY_CAR_RAW = 'dir:carousel:raw:min-png'
@@ -91,16 +86,17 @@ def sync_sftp_doc(sftp_index: SftpFileIndex):
 
 # define all jobs
 @catch_log_except()
-def air_quality_atmo_hdf_job():
+def air_quality_atmo_ge_job():
     # build url
-    base_url = 'https://services8.arcgis.com/rxZzohbySMKHTNcy/arcgis/rest/services/ind_hdf_3j/FeatureServer/0/query'
+    base_url = 'https://services3.arcgis.com/' \
+               'Is0UwT37raQYl9Jj/arcgis/rest/services/ind_grandest_5j/FeatureServer/0/query'
     params = {
-        'where': 'code_zone IN (02691, 59183, 59350, 59392, 59606, 80021)',
-        'outFields': 'date_ech, code_qual, lib_qual, lib_zone, code_zone',
-        'returnGeometry': 'false',
-        'resultRecordCount': '48',
-        'orderByFields': 'date_ech DESC',
-        'f': 'json'
+        "where": "code_zone IN (54395, 57463, 51454, 67482)",
+        "outFields": "date_ech, code_qual, lib_qual, lib_zone, code_zone",
+        "returnGeometry": "false",
+        "resultRecordCount": "48",
+        "orderByFields": "date_ech ASC",
+        "f": "json"
     }
     url = f'{base_url}?{urlencode(params)}'
     # https request
@@ -124,14 +120,12 @@ def air_quality_atmo_hdf_job():
     if not zones_d:
         raise ValueError('dataset is empty')
     # create and populate result dict
-    d_air_quality = {'amiens': zones_d.get('80021', 0),
-                     'dunkerque': zones_d.get('59183', 0),
-                     'lille': zones_d.get('59350', 0),
-                     'maubeuge': zones_d.get('59392', 0),
-                     'saint-quentin': zones_d.get('02691', 0),
-                     'valenciennes': zones_d.get('59606', 0)}
+    d_air_quality = {'nancy': zones_d.get(54395, 0),
+                     'metz': zones_d.get(57463, 0),
+                     'reims': zones_d.get(51454, 0),
+                     'strasbourg': zones_d.get(67482, 0)}
     # update redis
-    DB.main.set_as_json('json:atmo-hdf', d_air_quality, ex=6*3600)
+    DB.main.set_as_json('json:atmo-ge', d_air_quality, ex=6*3600)
 
 
 @catch_log_except()
@@ -164,11 +158,11 @@ def flyspray_job():
     if type(js_obj) is not dict:
         raise RuntimeError('json message is not a dict')
     try:
-        titles_l = list(js_obj['nord'])
+        titles_l = list(js_obj['est'])
     except (TypeError, KeyError):
-        raise RuntimeError('key "nord" is missing or have bad type in json message')
+        raise RuntimeError('key "est" is missing or have bad type in json message')
     # if all is ok: publish json to redis
-    key = 'json:flyspray-nord'
+    key = 'json:flyspray-est'
     logger.debug(f'update redis key {key} with {titles_l}')
     DB.main.set_as_json(key, titles_l, ex=3600)
 
@@ -200,121 +194,46 @@ def img_gmap_traffic_job():
     img_io = io.BytesIO()
     pil_img.save(img_io, format='PNG')
     # store RAW PNG to redis key
-    DB.main.set('img:traffic-map-nord:png', img_io.getvalue(), ex=2*3600)
+    DB.main.set('img:traffic-map-est:png', img_io.getvalue(), ex=2*3600)
 
 
 @catch_log_except()
-def img_cam_gate_job():
-    # if admin turn off this cam
-    if not CAM_GATE_IMG_URL:
-        return
-    # http request
-    with urlopen(CAM_GATE_IMG_URL, timeout=5.0) as uo_ret:
-        body = uo_ret.read()
-    # transform image
-    pil_img = Image.open(io.BytesIO(body))
-    pil_img = pil_img.crop((0, 0, 640, 440))
-    pil_img.thumbnail((339, 228))
-    # jpeg encode
-    img_io = io.BytesIO()
-    pil_img.save(img_io, format='JPEG')
-    # store RAW jpeg to redis key
-    DB.main.set('img:cam-gate:jpg', img_io.getvalue(), ex=120)
-
-
-@catch_log_except()
-def img_cam_door_1_job():
-    # if admin turn off this cam
-    if not CAM_DOOR_1_IMG_URL:
-        return
-    # http request
-    with urlopen(CAM_DOOR_1_IMG_URL, timeout=5.0) as uo_ret:
-        body = uo_ret.read()
-    # transform image
-    pil_img = Image.open(io.BytesIO(body))
-    pil_img = pil_img.crop((720, 0, 1200, 480))
-    pil_img.thumbnail((339, 228))
-    # jpeg encode
-    img_io = io.BytesIO()
-    pil_img.save(img_io, format='JPEG')
-    # store RAW jpeg to redis key
-    DB.main.set('img:cam-door-1:jpg', img_io.getvalue(), ex=120)
-
-
-@catch_log_except()
-def img_cam_door_2_job():
-    # if admin turn off this cam
-    if not CAM_DOOR_2_IMG_URL:
-        return
-    # http request
-    with urlopen(CAM_DOOR_2_IMG_URL, timeout=5.0) as uo_ret:
-        body = uo_ret.read()
-    # transform image
-    pil_img = Image.open(io.BytesIO(body))
-    pil_img = pil_img.crop((640, 0, 1280, 440))
-    pil_img.thumbnail((339, 228))
-    # jpeg encode
-    img_io = io.BytesIO()
-    pil_img.save(img_io, format='JPEG')
-    # store RAW jpeg to redis key
-    DB.main.set('img:cam-door-2:jpg', img_io.getvalue(), ex=120)
+def dir_est_img_job():
+    # retrieve DIR-est webcams: Houdemont, Velaine-en-Haye, Saint-Nicolas, Côte de Flavigny
+    for id_redis, lbl_cam, get_code in [('houdemont', 'Houdemont', '18'), ('velaine', 'Velaine', '53'),
+                                        ('st-nicolas', 'Saint-Nicolas', '49'), ('flavigny', 'Flavigny', '5')]:
+        url = f'https://webcam.dir-est.fr/app.php/lastimg/{get_code}'
+        with urlopen(url, timeout=5.0) as uo_ret:
+            body = uo_ret
+        # load image to PIL and resize it
+        img = Image.open(io.BytesIO(body))
+        img.thumbnail((224, 235))
+        # add text to image
+        time_str = datetime.now().strftime('%H:%M')
+        txt_img = f'{lbl_cam} - {time_str}'
+        # this font is in package "fonts-freefont-ttf"
+        font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeMono.ttf', 16)
+        draw = ImageDraw.Draw(img)
+        draw.text((5, 5), txt_img, (0x10, 0x0e, 0x0e), font=font)
+        # save image as PNG for redis
+        redis_io = io.BytesIO()
+        img.save(redis_io, format='PNG')
+        # update redis
+        DB.main.set('img:dir-est:%s:png' % id_redis, redis_io.getvalue(), ex=3600)
 
 
 @catch_log_except()
 def local_info_job():
     # http request
-    url = 'https://france3-regions.francetvinfo.fr/societe/rss?r=hauts-de-france'
-    with urlopen(url, timeout=5.0) as uo_ret:
-        body = uo_ret.read()
-    # parse RSS
-    l_titles = []
-    feed = feedparser.parse(body.decode('utf-8'))
-    for entrie in feed.entries:
-        title = str(entrie.title).strip().replace('\n', ' ')
-        l_titles.append(title)
-    DB.main.set_as_json('json:news', l_titles, ex=2*3600)
-
-
-@catch_log_except()
-def openweathermap_forecast_job():
-    # build url
-    base_url = 'http://api.openweathermap.org/data/2.5/forecast'
-    params = {
-        'q': 'Loos,fr',
-        'appid': OW_APP_ID,
-        'units': 'metric',
-        'lang': 'fr'
-    }
-    url = f'{base_url}?{urlencode(params)}'
-    # do request
-    with urlopen(url, timeout=5.0) as uo_ret:
-        body = uo_ret.read()
-    # decode json
-    ow_d = json.loads(body.decode('utf-8'))
-    t_today = None
-    d_days = {}
-    for i in range(0, 5):
-        d_days[i] = dict(t_min=50.0, t_max=-50.0, main='', description='', icon='')
-    # parse json
-    for item in ow_d['list']:
-        # for day-0 to day-4
-        for i_day in range(5):
-            txt_date, txt_time = item['dt_txt'].split(' ')
-            # search today
-            if txt_date == (datetime.now() + timedelta(days=i_day)).date().strftime('%Y-%m-%d'):
-                # search min/max temp
-                d_days[i_day]['t_min'] = min(d_days[i_day]['t_min'], item['main']['temp_min'])
-                d_days[i_day]['t_max'] = max(d_days[i_day]['t_max'], item['main']['temp_max'])
-                # main and icon in 12h item
-                if txt_time == '12:00:00' or t_today is None:
-                    d_days[i_day]['main'] = item['weather'][0]['main']
-                    d_days[i_day]['icon'] = item['weather'][0]['icon']
-                    d_days[i_day]['description'] = item['weather'][0]['description']
-                    if t_today is None:
-                        t_today = item['main']['temp']
-                        d_days[0]['t'] = t_today
-    # store to redis
-    DB.main.set_as_json('json:weather:forecast:loos', d_days, ex=2 * 3600)
+    rss_url = 'https://france3-regions.francetvinfo.fr/societe/rss?r=grand-est'
+    with urlopen(rss_url, timeout=5.0) as uo_ret:
+        # parse RSS
+        l_titles = []
+        feed = feedparser.parse(uo_ret.read())
+        for entrie in feed.entries:
+            title = str(entrie.title).strip().replace('\n', ' ')
+            l_titles.append(title)
+        DB.main.set_as_json('json:news', l_titles, ex=2*3600)
 
 
 @catch_log_except()
@@ -332,9 +251,9 @@ def vigilance_job():
     request = Request(url='https://public-api.meteofrance.fr/public/DPVigilance/v1/cartevigilance/encours',
                       headers={'apikey': VIGILANCE_KEY})
     with urlopen(request, timeout=10.0) as uo_ret:
-        body = uo_ret.read()
+        js_str = uo_ret.read().decode('utf-8')
     # decode json message
-    vig_raw_d = json.loads(body.decode('utf-8'))
+    vig_raw_d = json.loads(js_str)
     # check header
     js_update_iso_str = vig_raw_d['product']['update_time']
     js_update_dt = dateutil.parser.parse(js_update_iso_str)
@@ -368,48 +287,6 @@ def vigilance_job():
     DB.main.set_as_json('json:vigilance', vig_d, ex=2*3600)
 
 
-@catch_log_except()
-def weather_today_job():
-    # request data from NOAA server (METAR of Lille-Lesquin Airport)
-    request = Request(url='http://tgftp.nws.noaa.gov/data/observations/metar/stations/LFQQ.TXT',
-                      headers={'User-Agent': USER_AGENT})
-    with urlopen(request, timeout=10.0) as uo_ret:
-        body = uo_ret.read()
-    # METAR parse
-    metar_msg = body.decode('utf-8').split('\n')[1]
-    obs = Metar(metar_msg)
-    # init and populate d_today dict
-    d_today = {}
-    # message date and time
-    if obs.time:
-        dt_utc = obs.time.replace(tzinfo=timezone.utc)
-        d_today['update_iso'] = dt_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-        d_today['update_fr'] = dt_utc.astimezone().strftime('%H:%M %d/%m')
-    # current temperature
-    if obs.temp:
-        d_today['temp'] = round(obs.temp.value('C'))
-    # current dew point
-    if obs.dewpt:
-        d_today['dewpt'] = round(obs.dewpt.value('C'))
-    # current pressure
-    if obs.press:
-        d_today['press'] = round(obs.press.value('HPA'))
-    # current wind speed
-    if obs.wind_speed:
-        d_today['w_speed'] = round(obs.wind_speed.value('KMH'))
-    # current wind gust
-    if obs.wind_gust:
-        d_today['w_gust'] = round(obs.wind_gust.value('KMH'))
-    # current wind direction
-    if obs.wind_dir:
-        # replace 'W'est by 'O'uest
-        d_today['w_dir'] = obs.wind_dir.compass().replace('W', 'O')
-    # weather status str
-    d_today['descr'] = 'n/a'
-    # store to redis
-    DB.main.set_as_json('json:weather:today:loos', d_today, ex=2*3600)
-
-
 # main
 if __name__ == '__main__':
     # parse args
@@ -430,32 +307,27 @@ if __name__ == '__main__':
     try_sync_doc = TrySync(SFTP_DOC_DIR)
 
     # init scheduler
-    schedule.every(2).seconds.do(img_cam_gate_job)
-    schedule.every(2).seconds.do(img_cam_door_1_job)
-    schedule.every(2).seconds.do(img_cam_door_2_job)
     schedule.every(2).minutes.do(img_gmap_traffic_job)
     schedule.every(5).minutes.do(sftp_updated_job)
     schedule.every(5).minutes.at(':15').do(flyspray_job)
     schedule.every(5).minutes.do(gsheet_job)
+    schedule.every(5).minutes.do(dir_est_img_job)
     schedule.every(5).minutes.do(local_info_job)
     schedule.every(5).minutes.do(vigilance_job)
-    schedule.every(5).minutes.do(weather_today_job)
-    schedule.every(15).minutes.do(openweathermap_forecast_job)
-    schedule.every(60).minutes.do(air_quality_atmo_hdf_job)
+    schedule.every(60).minutes.do(air_quality_atmo_ge_job)
 
     # wait system ready (uptime > 25s)
     wait_uptime(min_s=25.0)
 
     # first call
-    air_quality_atmo_hdf_job()
+    img_gmap_traffic_job()
+    sftp_updated_job()
     flyspray_job()
     gsheet_job()
-    img_gmap_traffic_job()
+    dir_est_img_job()
     local_info_job()
-    openweathermap_forecast_job()
     vigilance_job()
-    weather_today_job()
-    sftp_updated_job()
+    air_quality_atmo_ge_job()
 
     # main loop
     while True:

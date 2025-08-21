@@ -51,7 +51,7 @@ class Tags(TagsBase):
     #           this thread periodically update tag value and avoid tk GUI loop do this and lose time on DB IO
     #        -> tags callbacks (read/write methods) are call by this IO thread (not by tkinter main thread)
     D_GSHEET_GRT = Tag(read=lambda: DB.main.get_js('json:gsheet'), io_every=2.0)
-    D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo'), io_every=2.0)
+    D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo-hdf'), io_every=2.0)
     D_W_TODAY_LOOS = Tag(read=lambda: DB.main.get_js('json:weather:today:loos'), io_every=2.0)
     D_W_FORECAST_LOOS = Tag(read=lambda: DB.main.get_js('json:weather:forecast:loos'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
@@ -60,9 +60,9 @@ class Tags(TagsBase):
     MET_TODAY_WH = Tag(read=lambda: DB.main.get_js('float:loos_elec:today_wh'), io_every=2.0)
     MET_YESTERDAY_WH = Tag(read=lambda: DB.main.get_js('float:loos_elec:yesterday_wh'), io_every=2.0)
     L_FLYSPRAY_RSS = Tag(read=lambda: DB.main.get_js('json:flyspray-nord'), io_every=2.0)
-    IMG_ATMO_HDF = Tag(read=lambda: DB.main.get('img:static:logo-atmo-hdf:png'), io_every=10.0)
+    IMG_LOGO_ATMO = Tag(read=lambda: DB.main.get('img:static:logo-atmo:png'), io_every=10.0)
     IMG_LOGO_GRT = Tag(read=lambda: DB.main.get('img:static:logo-grt:png'), io_every=10.0)
-    IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
+    IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map-nord:png'), io_every=10.0)
     IMG_CAM_GATE = Tag(read=lambda: DB.main.get('img:cam-gate:jpg'), io_every=2.0)
     IMG_CAM_DOOR_1 = Tag(read=lambda: DB.main.get('img:cam-door-1:jpg'), io_every=2.0)
     IMG_CAM_DOOR_2 = Tag(read=lambda: DB.main.get('img:cam-door-2:jpg'), io_every=2.0)
@@ -128,7 +128,7 @@ class LiveTilesTab(TilesTab):
     def __init__(self, *args, **kwargs):
         TilesTab.__init__(self, *args, **kwargs)
         # create all tiles for this tab here
-        # logo Atmo HDF
+        # logo Atmo
         self.tl_img_atmo = ImageRawTile(self, bg='white')
         self.tl_img_atmo.set_tile(row=0, column=0)
         # air quality Dunkerque
@@ -216,7 +216,7 @@ class LiveTilesTab(TilesTab):
         # traffic map
         self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get())
         # atmo
-        self.tl_img_atmo.load(Tags.IMG_ATMO_HDF.get())
+        self.tl_img_atmo.load(Tags.IMG_LOGO_ATMO.get())
         # GRT
         self.tl_img_grt.load(Tags.IMG_LOGO_GRT.get())
         # acc days stat

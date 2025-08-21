@@ -18,10 +18,7 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Any, Callable, List, Union
 
-import PIL.Image
-import PIL.ImageDraw
-import PIL.ImageFont
-import PIL.ImageTk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 import redis
 
@@ -84,11 +81,21 @@ def catch_log_except(catch=None, log_lvl=logging.ERROR, limit_arg_len=40):
 
 
 def wait_uptime(min_s: float):
+    """Waits until the system's uptime exceeds a specified minimum duration.
+
+    Note: This function is specific to Linux/Unix-like operating systems that
+    expose uptime information via `/proc/uptime`. It will not work on Windows
+    or other systems without this file.
+
+    Args:
+        min_s (float): The minimum uptime duration in seconds that must be
+                       reached before the function returns.
+    """
     while True:
         uptime = float(open('/proc/uptime', 'r').readline().split()[0])
         if uptime > min_s:
             break
-        time.sleep(0.1)
+        time.sleep(0.5)
 
 
 def fmt_value(value: Any, fmt: str = '', alt_str: str = 'n/a') -> str:
@@ -757,23 +764,24 @@ class ImageRawTile(Tile):
             widget_size = (self.winfo_width(), self.winfo_height())
             if img:
                 # RAW img data to Pillow (PIL) image
-                pil_img = PIL.Image.open(io.BytesIO(img))
+                pil_img = Image.open(io.BytesIO(img))
                 # apply crop (by default do nothing)
                 pil_img = pil_img.crop(crop)
                 # force image size to widget size
                 pil_img.thumbnail(widget_size)
             else:
                 # create a replace 'n/a' image
-                pil_img = PIL.Image.new('RGB', widget_size, Colors.PINK)
+                pil_img = Image.new('RGB', widget_size, Colors.PINK)
                 txt = 'n/a'
-                draw = PIL.ImageDraw.Draw(pil_img)
-                font = PIL.ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeMono.ttf', 24)
+                draw = ImageDraw.Draw(pil_img)
+                # this font is in package "fonts-freefont-ttf"
+                font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeMono.ttf', 24)
                 left, top, right, bottom = draw.textbbox((0, 0), txt, font=font)
                 x = (widget_size[0] - (right - left)) / 2
                 y = (widget_size[1] - (bottom - top)) / 2
                 draw.text((x, y), txt, fill='black', font=font)
             # update image label
-            self.tk_img = PIL.ImageTk.PhotoImage(pil_img)
+            self.tk_img = ImageTk.PhotoImage(pil_img)
             self.lbl_img.configure(image=self.tk_img)
         except Exception:
             logger.error(traceback.format_exc())

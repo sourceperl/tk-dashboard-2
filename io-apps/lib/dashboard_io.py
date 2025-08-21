@@ -146,7 +146,7 @@ def wait_uptime(min_s: float):
         uptime = float(open('/proc/uptime', 'r').readline().split()[0])
         if uptime > min_s:
             break
-        time.sleep(0.1)
+        time.sleep(0.5)
 
 
 # def byte_xor(data_1: bytes, data_2: bytes) -> bytes:

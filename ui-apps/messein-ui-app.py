@@ -38,13 +38,13 @@ class Tags(TagsBase):
     #           this thread periodically update tag value and avoid tk GUI loop do this and lose time on DB IO
     #        -> tags callbacks (read/write methods) are call by this IO thread (not by tkinter main thread)
     D_GSHEET_GRT = Tag(read=lambda: DB.main.get_js('json:gsheet'), io_every=2.0)
-    D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo'), io_every=2.0)
+    D_ATMO_QUALITY = Tag(read=lambda: DB.main.get_js('json:atmo-ge'), io_every=2.0)
     D_WEATHER_VIG = Tag(read=lambda: DB.main.get_js('json:vigilance'), io_every=2.0)
     D_NEWS_LOCAL = Tag(read=lambda: DB.main.get_js('json:news'), io_every=2.0)
-    L_FLYSPRAY_RSS = Tag(read=lambda: DB.main.get_js('from:loos:json:flyspray-est'), io_every=2.0)
-    IMG_ATMO_GE = Tag(read=lambda: DB.main.get('img:static:logo-atmo-ge:png'), io_every=10.0)
+    L_FLYSPRAY_RSS = Tag(read=lambda: DB.main.get_js('json:flyspray-est'), io_every=2.0)
+    IMG_LOGO_ATMO = Tag(read=lambda: DB.main.get('img:static:logo-atmo:png'), io_every=10.0)
     IMG_LOGO_GRT = Tag(read=lambda: DB.main.get('img:static:logo-grt:png'), io_every=10.0)
-    IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map:png'), io_every=10.0)
+    IMG_TRAFFIC_MAP = Tag(read=lambda: DB.main.get('img:traffic-map-est:png'), io_every=10.0)
     IMG_DIR_CAM_HOUDEMONT = Tag(read=lambda: DB.main.get('img:dir-est:houdemont:png'), io_every=10.0)
     IMG_DIR_CAM_VELAINE = Tag(read=lambda: DB.main.get('img:dir-est:velaine:png'), io_every=10.0)
     IMG_DIR_CAM_ST_NICOLAS = Tag(read=lambda: DB.main.get('img:dir-est:st-nicolas:png'), io_every=10.0)
@@ -101,7 +101,7 @@ class LiveTilesTab(TilesTab):
     def __init__(self, *args, **kwargs):
         TilesTab.__init__(self, *args, **kwargs)
         # create all tiles for this tab here
-        # logo Atmo EST
+        # logo Atmo
         self.tl_img_atmo = ImageRawTile(self, bg='white')
         self.tl_img_atmo.set_tile(row=0, column=0)
         # air quality Nancy
@@ -188,14 +188,14 @@ class LiveTilesTab(TilesTab):
         # traffic map
         self.tl_tf_map.load(Tags.IMG_TRAFFIC_MAP.get())
         # atmo
-        self.tl_img_atmo.load(Tags.IMG_ATMO_GE.get())
+        self.tl_img_atmo.load(Tags.IMG_LOGO_ATMO.get())
         # GRT
         self.tl_img_grt.load(Tags.IMG_LOGO_GRT.get())
         # DIR-Est webcams
-        self.tl_img_houdemont.load = Tags.IMG_DIR_CAM_HOUDEMONT.get()
-        self.tl_img_velaine.load = Tags.IMG_DIR_CAM_VELAINE.get()
-        self.tl_img_st_nicolas.load = Tags.IMG_DIR_CAM_ST_NICOLAS.get()
-        self.tl_img_flavigny.load = Tags.IMG_DIR_CAM_FLAVIGNY.get()
+        self.tl_img_houdemont.load(Tags.IMG_DIR_CAM_HOUDEMONT.get())
+        self.tl_img_velaine.load(Tags.IMG_DIR_CAM_VELAINE.get())
+        self.tl_img_st_nicolas.load(Tags.IMG_DIR_CAM_ST_NICOLAS.get())
+        self.tl_img_flavigny.load(Tags.IMG_DIR_CAM_FLAVIGNY.get())
         # acc days stat
         self.tl_acc.load(date_dts=Tags.D_GSHEET_GRT.get(path=('tags', 'DATE_ACC_DTS')))
         # air Nancy
