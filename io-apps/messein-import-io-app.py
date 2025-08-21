@@ -204,7 +204,7 @@ def dir_est_img_job():
                                         ('st-nicolas', 'Saint-Nicolas', '49'), ('flavigny', 'Flavigny', '5')]:
         url = f'https://webcam.dir-est.fr/app.php/lastimg/{get_code}'
         with urlopen(url, timeout=5.0) as uo_ret:
-            body = uo_ret
+            body = uo_ret.read()
         # load image to PIL and resize it
         img = Image.open(io.BytesIO(body))
         img.thumbnail((224, 235))

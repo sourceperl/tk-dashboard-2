@@ -356,21 +356,27 @@ class RedisFile:
 class TrySync:
     """Manages conditional synchronization with an SFTP directory based on index changes.
 
-    This class tracks the last known modification time of an SFTP directory's index.
-    It provides a `run` method that, when called, checks if the SFTP directory
-    has been updated since the last check. If changes are detected, a provided
-    synchronization function is executed.
+    This class tracks the last known modification time of an SFTP directory's index
+    and the number of cycles since the last sync. It provides a `run` method that
+    checks if the SFTP directory has been updated. If changes are detected, or
+    if a predefined number of cycles have passed, a provided synchronization
+    function is executed.
     """
 
-    def __init__(self, sftp_dir: str) -> None:
+    def __init__(self, sftp_dir: str, force_after: int = 12) -> None:
         """Initializes the TrySync instance.
 
         Args:
             sftp_dir (str): The path to the SFTP directory to monitor for changes.
+            force_after (int, optional): The number of cycles after which a sync
+                will be forced, regardless of whether a change is detected.
+                Defaults to 12.
         """
         # args
         self.sftp_dir = sftp_dir
+        self.force_after = force_after
         # private
+        self._n_cycles = 0
         self._last_sync_dt = datetime(year=2000, month=1, day=1, tzinfo=timezone.utc)
 
     def run(self, sftp_index: SftpFileIndex, on_sync_func: Callable):
@@ -381,11 +387,11 @@ class TrySync:
                 This object is used to access the SFTP directory's index and is
                 passed to the `on_sync_func` if a sync is triggered.
             on_sync_func (Callable[[SftpFileIndex], Any]): A callable (function or method)
-                that will be executed if a change in the SFTP directory's index
-                is detected. This callable should accept one argument: the
-                `SftpFileIndex` instance.
+                that will be executed to perform the synchronization. This callable
+                should accept one argument: the `SftpFileIndex` instance.
                 Example signature: `def my_sync_function(sftp_index: SftpFileIndex) -> None: ...`
         """
+        self._n_cycles += 1
         sftp_index.base_dir = self.sftp_dir
         idx_attrs = sftp_index.index_attributes()
         logger.debug(f'"{self.sftp_dir}" index size: {idx_attrs.size} bytes last update: {idx_attrs.mtime_dt}')
@@ -393,5 +399,11 @@ class TrySync:
             logger.info(f'index of "{self.sftp_dir}" change: run an SFTP sync')
             on_sync_func(sftp_index)
             self._last_sync_dt = idx_attrs.mtime_dt
+            self._n_cycles = 0
+        elif self._n_cycles >= self.force_after:
+            logger.info(f'{self._n_cycles} cycles without sync: run an SFTP sync')
+            on_sync_func(sftp_index)
+            self._last_sync_dt = idx_attrs.mtime_dt
+            self._n_cycles = 0
         else:
             logger.debug(f'no change occur, skip sync')
