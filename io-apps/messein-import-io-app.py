@@ -176,7 +176,7 @@ def gsheet_job():
     d = dict()
     gsheet_txt = body.decode('utf-8')
     for line in gsheet_txt.splitlines():
-        tag, value = line.split(',')
+        tag, value = line.split(',')[:2]
         d[tag] = value
     redis_d = dict(update=datetime.now().isoformat('T'), tags=d)
     DB.main.set_as_json('json:gsheet', redis_d, ex=2*3600)

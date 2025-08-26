@@ -16,9 +16,10 @@ import time
 import tkinter as tk
 import traceback
 from datetime import datetime, timedelta
-from typing import Any, Callable, List, Union
+from typing import Any, Callable, List, Optional, Union, cast
 
 from PIL import Image, ImageDraw, ImageFont, ImageTk
+
 
 import redis
 
@@ -136,25 +137,65 @@ class AsyncTask:
 class CustomRedis(redis.Redis):
     LOG_LEVEL = logging.DEBUG
 
+    # Note: Overriding execute_command is powerful as it centralizes
+    # error handling for all Redis commands.
     @catch_log_except(catch=redis.RedisError, log_lvl=LOG_LEVEL)
-    def execute_command(self, *args, **options):
+    def execute_command(self, *args: Any, **options: Any) -> Any:
+        """
+        Central point for executing commands. Catches and logs all RedisErrors.
+        """
         return super().execute_command(*args, **options)
 
-    @catch_log_except(catch=redis.RedisError, log_lvl=LOG_LEVEL)
+    # Note: The publish method now implicitly uses the error handling
+    # from the overridden execute_command.
     def publish(self, channel: Union[str, bytes], message: Union[str, bytes], **kwargs: Any) -> int:
-        return super().publish(channel, message, **kwargs)
+        """Publishes a message to a channel."""
+        return cast(int, super().publish(channel, message, **kwargs))
+    
+    @catch_log_except(catch=(redis.RedisError, TypeError), log_lvl=LOG_LEVEL)
+    def set_js(self, name: str, obj: Any, ex: Optional[int] = None, px: Optional[int] = None,
+               nx: bool = False, xx: bool = False, keepttl: bool = False) -> bool:
+        """
+        Sets a key with a JSON-encoded value.
 
-    @catch_log_except(catch=(redis.RedisError, AttributeError, json.decoder.JSONDecodeError), log_lvl=LOG_LEVEL)
-    def set_js(self, name, obj, ex=None, px=None, nx=False, xx=False, keepttl=False):
-        return super().set(name=name, value=json.dumps(obj), ex=ex, px=px, nx=nx, xx=xx, keepttl=keepttl)
+        Args:
+            name: The key name.
+            obj: The Python object to serialize to JSON.
+            ex: Set the specified expire time, in seconds.
+            px: Set the specified expire time, in milliseconds.
+            nx: Only set the key if it does not already exist.
+            xx: Only set the key if it already exists.
+            keepttl: Retain the time to live associated with the key.
 
-    @catch_log_except(catch=(redis.RedisError, AttributeError, json.decoder.JSONDecodeError), log_lvl=LOG_LEVEL)
-    def get_js(self, name):
-        return json.loads(super().get(name).decode('utf-8'))
+        Returns:
+            True if the set operation was successful, False otherwise.
+        """
+        value = json.dumps(obj)
+        return cast(bool, super().set(name=name, value=value, ex=ex, px=px, nx=nx, xx=xx, keepttl=keepttl))
+
+    @catch_log_except(catch=(redis.RedisError, json.decoder.JSONDecodeError, AttributeError), log_lvl=LOG_LEVEL)
+    def get_js(self, name: str) -> Optional[Any]:
+        """
+        Retrieves a JSON-encoded value from a key.
+
+        Args:
+            name: The key name.
+
+        Returns:
+            The Python object if the key exists and its value is valid JSON,
+            otherwise None.
+        """
+        get_response = super().get(name)
+        if isinstance(get_response, bytes):
+            return json.loads(get_response.decode('utf-8'))
+        if isinstance(get_response, str):
+            return json.loads(get_response)
+        return None
 
 
 class Tag:
-    def __init__(self, value=None, read: Callable = None, write: Callable = None, io_every: float = None) -> None:
+    def __init__(self, value=None, read: Optional[Callable] = None, write: Optional[Callable] = None,
+                 io_every: Optional[float] = None) -> None:
         # private
         self._value = value
         self._read_cmd = read
@@ -206,7 +247,7 @@ class Tag:
                 except Exception:
                     pass
 
-    def get(self, path: Union[str, list, tuple] = None, args: dict = None) -> object:
+    def get(self, path: Optional[Union[str, list, tuple]] = None, args: Optional[dict] = None) -> object:
         # process func args
         if args is None:
             args = {}
@@ -303,7 +344,7 @@ class TilesTab(tk.Frame):
     def tiles_height(self):
         return self._tiles_size[1]
 
-    def init_cyclic_update(self, every_ms: int = None):
+    def init_cyclic_update(self, every_ms: Optional[int] = None):
         # keep
         self._update_every_ms = every_ms
         # cancel previous cyclic loop if already set
@@ -397,15 +438,26 @@ class PdfTilesTab(TilesTab):
 # Tiles library
 class Tile(tk.Frame):
     """
-    Source of all the tile here
-    Default : a gray, black bordered, case
+    A customizable tile widget for a Tkinter GUI.
+
+    The Tile class is a Tkinter Frame configured with specific default
+    properties, such as a black border and a gray background. It also
+    includes functionality for handling click events and implementing
+    a periodic update loop.
     """
 
     def __init__(self, *args, **kwargs):
+        """
+        Initializes a Tile instance.
+
+        Args:
+            master: The parent widget.
+            **kwargs: Additional keyword arguments for the tk.Frame constructor.
+        """
         tk.Frame.__init__(self, *args, **kwargs)
         # private
-        self._update_every_ms = None
-        self._update_after_id = None
+        self._update_every_ms: Optional[int] = None
+        self._update_after_id: Optional[str] = None
         # tk stuff
         self.configure(highlightbackground=Colors.TILE_BORDER)
         self.configure(highlightthickness=3)
@@ -417,33 +469,69 @@ class Tile(tk.Frame):
         self.pack_propagate(False)
         self.grid_propagate(False)
 
-    def add_on_click_cmd(self, cmd: Callable):
-        self.bind('<Button-1>', lambda evt: cmd(), add='+')
-        for widget in self.winfo_children():
-            widget.bind('<Button-1>', lambda evt: cmd(), add='+')
-
-    def set_tile(self, row=0, column=0, rowspan=1, columnspan=1):
-        # function to print a tile on the screen at the given coordonates
-        self.grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan, sticky=tk.NSEW)
-
-    def init_cyclic_update(self, every_ms: int = None):
-        # keep
-        self._update_every_ms = every_ms
-        # cancel previous cyclic loop if already set
-        if self._update_after_id:
-            self.after_cancel(self._update_after_id)
-        # init loop
-        if self._update_every_ms:
-            self._do_cyclic_update()
-
     def _do_cyclic_update(self):
-        # call update() if this tile is currently displayed
+        """Internal method to handle the periodic update process."""
+        # if this tile is currently displayed
         if self.winfo_ismapped():
             self.update()
-        # set next periodic call
-        self._update_after_id = self.after(self._update_every_ms, self._do_cyclic_update)
+        # init next periodic call
+        if self._update_every_ms is not None:
+            self._update_after_id = self.after(self._update_every_ms, self._do_cyclic_update)
+
+    def add_on_click_cmd(self, cmd: Callable):
+        """
+        Adds a command to be executed when the tile or any of its
+        children are clicked.
+
+        Args:
+            cmd: The callable to execute on a left-click event.
+        """
+        def on_click(event):
+            cmd()
+
+        self.bind('<Button-1>', on_click, add='+')
+        for widget in self.winfo_children():
+            widget.bind('<Button-1>', on_click, add='+')
+
+    def set_tile(self, row: int = 0, column: int = 0, rowspan: int = 1, columnspan: int = 1):
+        """
+        Places the tile on the screen using the grid geometry manager.
+
+        Args:
+            row: The row to place the tile in.
+            column: The column to place the tile in.
+            rowspan: The number of rows the tile spans.
+            columnspan: The number of columns the tile spans.
+        """
+        self.grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan, sticky=tk.NSEW)
+
+    def start_cyclic_update(self, every_ms: Optional[int] = None):
+        """
+        Starts a periodic update loop for the tile.
+
+        Args:
+            every_ms: The time in milliseconds between each update.
+                      If None, any existing update loop will be cancelled.
+        """
+        self.stop_cyclic_update()
+
+        self._update_every_ms = every_ms
+        if self._update_every_ms is not None:
+            self._do_cyclic_update()
+
+    def stop_cyclic_update(self):
+        """Cancels any active periodic update loop."""
+        if self._update_after_id:
+            self.after_cancel(self._update_after_id)
+            self._update_after_id = None
 
     def update(self):
+        """
+        Placeholder method for updating the tile's content.
+
+        This method should be overridden by a subclass to provide
+        specific update logic.
+        """
         pass
 
 
@@ -515,7 +603,7 @@ class ClockTile(Tile):
         tk.Label(self, textvariable=self._time_str, font=('digital-7', 30), bg=self.cget('bg'),
                  fg=Colors.TXT).pack(expand=True)
         # auto-update clock every 500ms
-        self.init_cyclic_update(every_ms=500)
+        self.start_cyclic_update(every_ms=500)
 
     def update(self):
         self._date_str.set(datetime.now().strftime('%A %d %B %Y'))
@@ -553,7 +641,7 @@ class DaysAccTileLoos(Tile):
         tk.Label(self, text='jours sans accident DIGNE',
                  font=('courier', 18, 'bold'), bg=self.cget('bg'), fg=Colors.TXT).grid(row=2, column=1, sticky=tk.W)
         # auto-update acc day counter every 5s
-        self.init_cyclic_update(every_ms=5_000)
+        self.start_cyclic_update(every_ms=5_000)
 
     def load(self, date_dts: str, date_digne: str) -> None:
         # enforce type
@@ -602,7 +690,7 @@ class DaysAccTileMessein(Tile):
         tk.Label(self, text='jours sans accident DTS',
                  font=('courier', 14, 'bold'), bg=self.cget('bg'), fg=Colors.TXT).grid(row=1, column=1, sticky=tk.W)
         # auto-update acc day counter every 5s
-        self.init_cyclic_update(every_ms=5_000)
+        self.start_cyclic_update(every_ms=5_000)
 
     def load(self, date_dts: str) -> None:
         # enforce type
@@ -753,12 +841,12 @@ class ImageRawTile(Tile):
         self.lbl_img = tk.Label(self, bg=self.cget('bg'))
         self.lbl_img.pack(expand=True)
 
-    def load(self, img: bytes, crop: tuple = None) -> None:
+    def load(self, img: bytes, crop: Optional[tuple] = None) -> None:
         # enforce type
         try:
             img = bytes(img)
         except (TypeError, ValueError):
-            img = None
+            img = b''
         # display current image or 'n/a'
         try:
             widget_size = (self.winfo_width(), self.winfo_height())
@@ -802,7 +890,7 @@ class ImageRawCarouselTile(ImageRawTile):
         self.after(ms=3_000, func=self.update)
         # init image change_s rate
         if update_ms:
-            self.init_cyclic_update(every_ms=update_ms)
+            self.start_cyclic_update(every_ms=update_ms)
 
     def update(self):
         # display next image or skip this if skip counter is set
@@ -868,14 +956,27 @@ class NewsBannerTile(Tile):
         tk.Label(self, textvariable=self._lbl_ban, height=1,
                  bg=self.cget('bg'), fg=Colors.NEWS_TXT, font=('courier', 51, 'bold')).pack(expand=True)
         # auto-update banner every 200ms
-        self.init_cyclic_update(every_ms=200)
+        self.start_cyclic_update(every_ms=200)
+
+    def _on_data_change(self):
+        spaces_head = ' ' * self.ban_nb_char
+        try:
+            # update banner
+            self._next_ban_str = spaces_head
+            for title in self._titles_l:
+                self._next_ban_str += title + spaces_head
+        except TypeError:
+            self._next_ban_str = spaces_head + 'n/a' + spaces_head
+        except Exception:
+            self._next_ban_str = spaces_head + 'n/a' + spaces_head
+            logger.error(traceback.format_exc())
 
     def load(self, titles_l: List[str]) -> None:
         # enforce type
         try:
             titles_l = list(titles_l)
         except (TypeError, ValueError):
-            titles_l = None
+            titles_l = []
         # on change -> update widget
         if self._titles_l != titles_l:
             self._titles_l = titles_l
@@ -891,19 +992,6 @@ class NewsBannerTile(Tile):
         scroll_view = self._disp_ban_str[self._disp_ban_pos:self._disp_ban_pos + self.ban_nb_char]
         self._lbl_ban.set(scroll_view)
         self._disp_ban_pos += 1
-
-    def _on_data_change(self):
-        spaces_head = ' ' * self.ban_nb_char
-        try:
-            # update banner
-            self._next_ban_str = spaces_head
-            for title in self._titles_l:
-                self._next_ban_str += title + spaces_head
-        except TypeError:
-            self._next_ban_str = spaces_head + 'n/a' + spaces_head
-        except Exception:
-            self._next_ban_str = spaces_head + 'n/a' + spaces_head
-            logger.error(traceback.format_exc())
 
 
 class VigilanceTile(Tile):
